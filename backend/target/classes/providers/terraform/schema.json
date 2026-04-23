@@ -1,0 +1,100 @@
+{
+  "id": "terraform",
+  "label": "Terraform",
+  "version": "1.0",
+  "fileExtension": ".tf",
+  "sections": [
+    {
+      "id": "provider",
+      "label": "Provider",
+      "fields": [
+        {
+          "id": "cloud",
+          "label": "Cloud",
+          "type": "select",
+          "options": ["aws"],
+          "required": true,
+          "defaultValue": "aws",
+          "help": "Cloud provider to target. GCP and Azure support coming in a future phase."
+        },
+        {
+          "id": "region",
+          "label": "Region",
+          "type": "select",
+          "options": [
+            "us-east-1",
+            "us-east-2",
+            "us-west-1",
+            "us-west-2",
+            "eu-west-1",
+            "eu-west-2",
+            "eu-central-1",
+            "ap-southeast-1",
+            "ap-northeast-1"
+          ],
+          "required": true,
+          "defaultValue": "us-east-1",
+          "help": "AWS region where all resources in this configuration will be provisioned."
+        }
+      ]
+    },
+    {
+      "id": "ec2",
+      "label": "EC2 Instance",
+      "fields": [
+        {
+          "id": "resource_name",
+          "label": "Resource name",
+          "type": "text",
+          "placeholder": "main",
+          "required": true,
+          "defaultValue": "main",
+          "help": "Terraform logical identifier. Referenced elsewhere as aws_instance.<name>.id. Use lowercase letters, digits, and underscores only."
+        },
+        {
+          "id": "instance_type",
+          "label": "Instance type",
+          "type": "select",
+          "options": [
+            "t2.micro",
+            "t3.micro",
+            "t3.small",
+            "t3.medium",
+            "t3.large",
+            "m5.large",
+            "m5.xlarge",
+            "c5.large"
+          ],
+          "required": true,
+          "defaultValue": "t3.micro",
+          "help": "EC2 instance size. t2.micro and t3.micro are free-tier eligible."
+        },
+        {
+          "id": "ami_id",
+          "label": "AMI ID",
+          "type": "text",
+          "placeholder": "ami-0c55b159cbfafe1f0",
+          "required": true,
+          "help": "Amazon Machine Image ID. Region-specific — find one in AWS Console under EC2 > AMIs, or use the AWS SSM Parameter Store for latest Amazon Linux 2 AMIs."
+        },
+        {
+          "id": "instance_count",
+          "label": "Instance count",
+          "type": "select",
+          "options": ["1", "2", "3", "5", "10"],
+          "required": true,
+          "defaultValue": "1",
+          "help": "Number of identical instances to create. Uses Terraform count meta-argument."
+        },
+        {
+          "id": "name_tag",
+          "label": "Name tag",
+          "type": "text",
+          "placeholder": "my-instance",
+          "required": false,
+          "help": "Optional. Sets the Name tag visible in the AWS Console EC2 instance list."
+        }
+      ]
+    }
+  ]
+}
