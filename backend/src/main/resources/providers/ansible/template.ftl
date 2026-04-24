@@ -148,7 +148,7 @@
 </#list>
 <#else>
       ansible.builtin.${task.package_manager!"apt"}:
-        name: <#if task.packages?contains(",")>[<#list task.packages?split(",") as p><#if p?trim?has_content>"${p?trim}"<#sep>, </#sep></#if></#list>]<#else>${task.packages!""}</#if>
+        name: <#if (task.packages!"")?contains(",")>[<#list task.packages?split(",") as p><#if p?trim?has_content>"${p?trim}"<#sep>, </#sep></#if></#list>]<#else>${task.packages!""}</#if>
         state: ${task.package_state!"present"}
         update_cache: ${task.update_cache!"false"}
 </#if>

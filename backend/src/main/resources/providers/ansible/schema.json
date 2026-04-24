@@ -1,7 +1,7 @@
 {
   "id": "ansible",
   "label": "Ansible",
-  "version": "1.0",
+  "version": "2.0",
   "fileExtension": ".yml",
   "sections": [
     {
@@ -11,14 +11,18 @@
       "repeatable": false,
       "fields": [
         { "id": "playbook_name", "label": "Playbook name", "type": "text", "required": true, "defaultValue": "My Playbook" },
-        { "id": "hosts", "label": "Target hosts", "type": "text", "required": true, "defaultValue": "all", "help": "Host pattern from your inventory. Use 'all', a group name (e.g. webservers), or a specific host." },
-        { "id": "gather_facts", "label": "Gather facts", "type": "select", "required": true, "defaultValue": "true", "options": ["true","false"], "help": "Set to false to skip gathering host facts and speed up execution." },
-        { "id": "become", "label": "Privilege escalation (become)", "type": "select", "required": true, "defaultValue": "false", "options": ["false","true"] },
-        { "id": "become_user", "label": "Become user", "type": "text", "required": false, "defaultValue": "root", "help": "User to escalate to. Only used when become = true." },
-        { "id": "connection", "label": "Connection type", "type": "select", "required": true, "defaultValue": "ssh", "options": ["ssh","local","docker","winrm"] },
-        { "id": "strategy", "label": "Execution strategy", "type": "select", "required": true, "defaultValue": "linear", "options": ["linear","free","debug"], "help": "'free' lets each host run tasks as fast as possible without waiting for others." },
-        { "id": "any_errors_fatal", "label": "Any errors fatal", "type": "select", "required": true, "defaultValue": "false", "options": ["false","true"], "help": "If true, any failed task on any host stops the entire play." },
-        { "id": "max_fail_percentage", "label": "Max fail percentage", "type": "text", "required": false, "placeholder": "0", "help": "Abort play if this percentage of hosts fail. Leave blank to ignore." }
+        { "id": "hosts", "label": "Target hosts", "type": "text", "required": true, "defaultValue": "all", "help": "Host pattern from your inventory. Use 'all', a group name (e.g. webservers), or a specific hostname." },
+        { "id": "gather_facts", "label": "Gather facts", "type": "toggle", "required": false, "defaultValue": "true", "help": "Disable to skip collecting host facts and speed up playbook execution on large inventories." },
+        { "id": "become", "label": "Privilege escalation (become)", "type": "toggle", "required": false, "defaultValue": "false", "help": "Run all tasks with sudo/su. Can be overridden per task." },
+        { "id": "become_user", "label": "Become user", "type": "text", "required": false, "defaultValue": "root", "help": "User to escalate to. Only relevant when become is enabled." },
+        { "id": "become_method", "label": "Become method", "type": "select", "required": false, "defaultValue": "sudo", "options": ["sudo", "su", "pbrun", "pfexec", "doas", "dzdo", "ksu", "runas"] },
+        { "id": "connection", "label": "Connection type", "type": "select", "required": true, "defaultValue": "ssh", "options": ["ssh", "local", "docker", "winrm", "paramiko"], "help": "Transport used to connect to managed hosts." },
+        { "id": "strategy", "label": "Execution strategy", "type": "select", "required": true, "defaultValue": "linear", "options": ["linear", "free", "debug"], "help": "'linear' waits for all hosts to finish each task before moving to the next. 'free' lets each host run as fast as possible." },
+        { "id": "serial", "label": "Serial (rolling update batch size)", "type": "text", "required": false, "placeholder": "1", "help": "Number or percentage of hosts to run at a time. Use for zero-downtime rolling deploys. e.g. '1', '2', '30%'" },
+        { "id": "any_errors_fatal", "label": "Any errors fatal", "type": "toggle", "required": false, "defaultValue": "false", "help": "If enabled, a failure on any host immediately aborts the entire play for all hosts." },
+        { "id": "max_fail_percentage", "label": "Max fail percentage", "type": "text", "required": false, "placeholder": "0", "help": "Abort play if this percentage of hosts fail. Leave blank to disable." },
+        { "id": "environment_key", "label": "Environment variable name", "type": "text", "required": false, "placeholder": "APP_ENV", "help": "Optional environment variable to set for all tasks in this play." },
+        { "id": "environment_value", "label": "Environment variable value", "type": "text", "required": false, "placeholder": "production" }
       ]
     },
     {
@@ -29,8 +33,22 @@
       "repeatable": true,
       "maxInstances": 50,
       "fields": [
-        { "id": "var_name", "label": "Variable name", "type": "text", "required": true, "placeholder": "app_port" },
-        { "id": "var_value", "label": "Value", "type": "text", "required": true, "placeholder": "8080" }
+        { "id": "var_name", "label": "Variable name", "type": "text", "required": true, "placeholder": "app_port", "help": "Use snake_case. Variable names must start with a letter or underscore." },
+        { "id": "var_value", "label": "Value", "type": "text", "required": true, "placeholder": "8080", "help": "String, number, or quoted YAML. For complex types, use 'set_fact' tasks instead." }
+      ]
+    },
+    {
+      "id": "pre_tasks",
+      "label": "Pre-Tasks",
+      "optional": true,
+      "defaultEnabled": false,
+      "repeatable": true,
+      "maxInstances": 10,
+      "fields": [
+        { "id": "task_name", "label": "Task name", "type": "text", "required": true, "placeholder": "Verify OS family" },
+        { "id": "module", "label": "Module", "type": "select", "required": true, "defaultValue": "assert", "options": ["assert", "debug", "command", "shell", "set_fact", "fail"], "help": "Pre-tasks run before roles and the main tasks block. Commonly used for validation and environment checks." },
+        { "id": "command", "label": "Command / message / expression", "type": "text", "required": true, "placeholder": "echo pre-flight check" },
+        { "id": "when_condition", "label": "When condition", "type": "text", "required": false, "placeholder": "ansible_os_family == 'Debian'" }
       ]
     },
     {
@@ -42,10 +60,15 @@
       "maxInstances": 30,
       "fields": [
         { "id": "task_name", "label": "Task name", "type": "text", "required": true, "placeholder": "Install nginx" },
-        { "id": "package_manager", "label": "Package manager", "type": "select", "required": true, "defaultValue": "apt", "options": ["apt","yum","dnf","pacman","zypper","pip","npm","gem"] },
-        { "id": "package_name", "label": "Package name(s)", "type": "text", "required": true, "placeholder": "nginx", "help": "Single package name. For multiple packages, add a separate task per package." },
-        { "id": "package_state", "label": "State", "type": "select", "required": true, "defaultValue": "present", "options": ["present","absent","latest","build-dep"] },
-        { "id": "update_cache", "label": "Update cache first", "type": "select", "required": true, "defaultValue": "false", "options": ["false","true"] }
+        { "id": "package_manager", "label": "Package manager", "type": "select", "required": true, "defaultValue": "apt", "options": ["apt", "yum", "dnf", "pacman", "zypper", "pip", "npm", "gem"], "help": "Use 'apt' for Debian/Ubuntu, 'yum'/'dnf' for RHEL/CentOS/Amazon Linux." },
+        { "id": "packages", "label": "Package name(s)", "type": "text", "required": true, "placeholder": "nginx", "help": "Single package name or comma-separated list e.g. nginx, curl, git" },
+        { "id": "package_state", "label": "State", "type": "select", "required": true, "defaultValue": "present", "options": ["present", "absent", "latest", "build-dep"], "help": "'present' installs if missing. 'latest' upgrades to newest version. 'absent' removes." },
+        { "id": "update_cache", "label": "Update cache first", "type": "toggle", "required": false, "defaultValue": "false", "help": "Equivalent to 'apt-get update' before installing. Recommended when state is 'latest'." },
+        { "id": "loop_items", "label": "Loop — install from list", "type": "textarea", "required": false, "placeholder": "nginx\ncurl\ngit\nunzip", "help": "One package per line. When set, the 'Package name(s)' field is ignored and each item in this list is installed as a separate loop iteration." },
+        { "id": "when_condition", "label": "When condition", "type": "text", "required": false, "placeholder": "ansible_os_family == 'Debian'" },
+        { "id": "notify", "label": "Notify handler", "type": "text", "required": false, "placeholder": "Restart nginx", "help": "Name of a handler to trigger when this task makes a change." },
+        { "id": "tags", "label": "Tags", "type": "text", "required": false, "placeholder": "packages, install", "help": "Comma-separated tags. Run only tagged tasks with: ansible-playbook --tags packages" },
+        { "id": "ignore_errors", "label": "Ignore errors", "type": "toggle", "required": false, "defaultValue": "false" }
       ]
     },
     {
@@ -56,11 +79,15 @@
       "repeatable": true,
       "maxInstances": 20,
       "fields": [
-        { "id": "task_name", "label": "Task name", "type": "text", "required": true, "placeholder": "Start nginx" },
+        { "id": "task_name", "label": "Task name", "type": "text", "required": true, "placeholder": "Start and enable nginx" },
         { "id": "service_name", "label": "Service name", "type": "text", "required": true, "placeholder": "nginx" },
-        { "id": "service_state", "label": "State", "type": "select", "required": true, "defaultValue": "started", "options": ["started","stopped","restarted","reloaded"] },
-        { "id": "service_enabled", "label": "Enabled on boot", "type": "select", "required": true, "defaultValue": "true", "options": ["true","false"] },
-        { "id": "daemon_reload", "label": "Daemon reload (systemd)", "type": "select", "required": true, "defaultValue": "false", "options": ["false","true"] }
+        { "id": "service_state", "label": "State", "type": "select", "required": true, "defaultValue": "started", "options": ["started", "stopped", "restarted", "reloaded"], "help": "'reloaded' sends SIGHUP (graceful). 'restarted' does a full stop/start." },
+        { "id": "service_enabled", "label": "Enabled on boot", "type": "toggle", "required": false, "defaultValue": "true" },
+        { "id": "daemon_reload", "label": "Daemon reload (systemd)", "type": "toggle", "required": false, "defaultValue": "false", "help": "Run 'systemctl daemon-reload' before managing the service. Required after modifying unit files." },
+        { "id": "when_condition", "label": "When condition", "type": "text", "required": false, "placeholder": "ansible_service_mgr == 'systemd'" },
+        { "id": "notify", "label": "Notify handler", "type": "text", "required": false, "placeholder": "Restart nginx" },
+        { "id": "tags", "label": "Tags", "type": "text", "required": false, "placeholder": "services" },
+        { "id": "ignore_errors", "label": "Ignore errors", "type": "toggle", "required": false, "defaultValue": "false" }
       ]
     },
     {
@@ -71,15 +98,44 @@
       "repeatable": true,
       "maxInstances": 30,
       "fields": [
-        { "id": "task_name", "label": "Task name", "type": "text", "required": true, "placeholder": "Copy config file" },
-        { "id": "file_module", "label": "Module", "type": "select", "required": true, "defaultValue": "copy", "options": ["copy","template","file","lineinfile","blockinfile","fetch","replace","stat"] },
-        { "id": "src", "label": "Source path", "type": "text", "required": false, "placeholder": "files/nginx.conf" },
+        { "id": "task_name", "label": "Task name", "type": "text", "required": true, "placeholder": "Copy nginx config" },
+        { "id": "file_module", "label": "Module", "type": "select", "required": true, "defaultValue": "copy", "options": ["copy", "file", "lineinfile", "blockinfile", "fetch", "replace", "stat"], "help": "'copy' copies a file from control node. 'file' manages file attributes/state. 'lineinfile' ensures a line exists. 'fetch' retrieves a file from a remote host." },
+        { "id": "src", "label": "Source path", "type": "text", "required": false, "placeholder": "files/nginx.conf", "help": "Relative path to file in your playbook 'files/' directory. Not used by 'file' or 'lineinfile' modules." },
         { "id": "dest", "label": "Destination path", "type": "text", "required": true, "placeholder": "/etc/nginx/nginx.conf" },
+        { "id": "content", "label": "Inline content", "type": "textarea", "required": false, "placeholder": "server { listen 80; }", "help": "Use instead of 'src' to write content directly into the file. Only for the 'copy' module." },
         { "id": "owner", "label": "Owner", "type": "text", "required": false, "placeholder": "root" },
         { "id": "group", "label": "Group", "type": "text", "required": false, "placeholder": "root" },
-        { "id": "mode", "label": "Mode", "type": "text", "required": false, "placeholder": "0644" },
-        { "id": "file_state", "label": "State (file module only)", "type": "select", "required": false, "defaultValue": "present", "options": ["present","absent","directory","touch","link","hard"] },
-        { "id": "recurse", "label": "Recurse (directory)", "type": "select", "required": false, "defaultValue": "false", "options": ["false","true"] }
+        { "id": "mode", "label": "Mode", "type": "text", "required": false, "placeholder": "0644", "help": "Octal permission mode e.g. '0644', '0755', '0600'" },
+        { "id": "file_state", "label": "State (file module)", "type": "select", "required": false, "defaultValue": "present", "options": ["present", "absent", "directory", "touch", "link", "hard"], "help": "Only applied when module is 'file'. Use 'directory' to create dirs, 'absent' to delete." },
+        { "id": "recurse", "label": "Recurse (directory)", "type": "toggle", "required": false, "defaultValue": "false", "help": "Apply owner/group/mode recursively to a directory." },
+        { "id": "backup", "label": "Backup existing file", "type": "toggle", "required": false, "defaultValue": "false" },
+        { "id": "line", "label": "Line (lineinfile)", "type": "text", "required": false, "placeholder": "JAVA_HOME=/usr/lib/jvm/java-21", "help": "The line to ensure is present. Used with 'lineinfile' module." },
+        { "id": "regexp", "label": "Regexp (lineinfile/replace)", "type": "text", "required": false, "placeholder": "^JAVA_HOME=.*", "help": "Regular expression to find existing line to replace." },
+        { "id": "when_condition", "label": "When condition", "type": "text", "required": false, "placeholder": "ansible_os_family == 'Debian'" },
+        { "id": "notify", "label": "Notify handler", "type": "text", "required": false, "placeholder": "Restart nginx" },
+        { "id": "tags", "label": "Tags", "type": "text", "required": false, "placeholder": "config" },
+        { "id": "ignore_errors", "label": "Ignore errors", "type": "toggle", "required": false, "defaultValue": "false" }
+      ]
+    },
+    {
+      "id": "tasks_template",
+      "label": "Tasks — Jinja2 Templates",
+      "optional": true,
+      "defaultEnabled": false,
+      "repeatable": true,
+      "maxInstances": 20,
+      "fields": [
+        { "id": "task_name", "label": "Task name", "type": "text", "required": true, "placeholder": "Deploy app config" },
+        { "id": "template_src", "label": "Template source (.j2)", "type": "text", "required": true, "placeholder": "templates/app.conf.j2", "help": "Path to .j2 Jinja2 template relative to your playbook directory." },
+        { "id": "template_dest", "label": "Destination path", "type": "text", "required": true, "placeholder": "/etc/app/app.conf" },
+        { "id": "owner", "label": "Owner", "type": "text", "required": false, "placeholder": "root" },
+        { "id": "group", "label": "Group", "type": "text", "required": false, "placeholder": "root" },
+        { "id": "mode", "label": "Mode", "type": "text", "required": false, "placeholder": "0640" },
+        { "id": "backup", "label": "Backup existing file", "type": "toggle", "required": false, "defaultValue": "false" },
+        { "id": "validate", "label": "Validate command", "type": "text", "required": false, "placeholder": "nginx -t -c %s", "help": "Command to validate rendered file before deploying. %s is replaced with a temp file path." },
+        { "id": "when_condition", "label": "When condition", "type": "text", "required": false },
+        { "id": "notify", "label": "Notify handler", "type": "text", "required": false, "placeholder": "Restart nginx" },
+        { "id": "tags", "label": "Tags", "type": "text", "required": false, "placeholder": "config, templates" }
       ]
     },
     {
@@ -91,12 +147,19 @@
       "maxInstances": 30,
       "fields": [
         { "id": "task_name", "label": "Task name", "type": "text", "required": true, "placeholder": "Run database migration" },
-        { "id": "command_module", "label": "Module", "type": "select", "required": true, "defaultValue": "command", "options": ["command","shell","raw","script"], "help": "'command' is safer (no shell expansion). Use 'shell' for pipes, redirects, or environment expansion." },
-        { "id": "command", "label": "Command", "type": "textarea", "required": true, "placeholder": "/usr/bin/python manage.py migrate" },
+        { "id": "command_module", "label": "Module", "type": "select", "required": true, "defaultValue": "command", "options": ["command", "shell", "raw", "script"], "help": "'command' is safer — no shell expansion, no pipes. Use 'shell' for pipes (|), redirects (>), or env vars ($VAR). 'raw' for hosts without Python." },
+        { "id": "command", "label": "Command", "type": "textarea", "required": true, "placeholder": "/usr/bin/python manage.py migrate --noinput" },
         { "id": "chdir", "label": "Working directory (chdir)", "type": "text", "required": false, "placeholder": "/var/app" },
-        { "id": "creates", "label": "Creates (idempotency check)", "type": "text", "required": false, "help": "If this path exists, the task is skipped." },
-        { "id": "register_var", "label": "Register output as variable", "type": "text", "required": false, "placeholder": "migration_result" },
-        { "id": "ignore_errors", "label": "Ignore errors", "type": "select", "required": false, "defaultValue": "false", "options": ["false","true"] }
+        { "id": "creates", "label": "Creates (idempotency)", "type": "text", "required": false, "placeholder": "/var/app/.migrated", "help": "Skip this task if this path already exists. Use to make commands idempotent." },
+        { "id": "removes", "label": "Removes (idempotency)", "type": "text", "required": false, "placeholder": "/tmp/setup.lock", "help": "Skip this task if this path does NOT exist." },
+        { "id": "environment_key", "label": "Environment variable name", "type": "text", "required": false, "placeholder": "RAILS_ENV" },
+        { "id": "environment_value", "label": "Environment variable value", "type": "text", "required": false, "placeholder": "production" },
+        { "id": "register_var", "label": "Register output as", "type": "text", "required": false, "placeholder": "migration_result", "help": "Store stdout/stderr/rc in this variable. Access with {{ migration_result.stdout }}" },
+        { "id": "loop_items", "label": "Loop items", "type": "textarea", "required": false, "placeholder": "db_migrate\ndb_seed\ncache_clear", "help": "One item per line. Access current item in command with {{ item }}" },
+        { "id": "when_condition", "label": "When condition", "type": "text", "required": false, "placeholder": "ansible_os_family == 'Debian'" },
+        { "id": "notify", "label": "Notify handler", "type": "text", "required": false },
+        { "id": "tags", "label": "Tags", "type": "text", "required": false, "placeholder": "deploy" },
+        { "id": "ignore_errors", "label": "Ignore errors", "type": "toggle", "required": false, "defaultValue": "false" }
       ]
     },
     {
@@ -109,12 +172,18 @@
       "fields": [
         { "id": "task_name", "label": "Task name", "type": "text", "required": true, "placeholder": "Create deploy user" },
         { "id": "username", "label": "Username", "type": "text", "required": true, "placeholder": "deploy" },
-        { "id": "user_state", "label": "State", "type": "select", "required": true, "defaultValue": "present", "options": ["present","absent"] },
-        { "id": "groups", "label": "Groups (comma-separated)", "type": "text", "required": false, "placeholder": "sudo,docker" },
-        { "id": "shell", "label": "Login shell", "type": "text", "required": false, "defaultValue": "/bin/bash" },
-        { "id": "home_dir", "label": "Home directory", "type": "text", "required": false, "placeholder": "/home/deploy" },
-        { "id": "create_home", "label": "Create home directory", "type": "select", "required": true, "defaultValue": "true", "options": ["true","false"] },
-        { "id": "password_lock", "label": "Lock password (SSH-only)", "type": "select", "required": true, "defaultValue": "true", "options": ["true","false"] }
+        { "id": "user_state", "label": "State", "type": "select", "required": true, "defaultValue": "present", "options": ["present", "absent"] },
+        { "id": "user_groups", "label": "Groups (comma-separated)", "type": "text", "required": false, "placeholder": "sudo,docker", "help": "Supplementary groups. The user's primary group is created automatically." },
+        { "id": "append_groups", "label": "Append groups (don't remove existing)", "type": "toggle", "required": false, "defaultValue": "true", "help": "When enabled, listed groups are added to the user's existing groups. When disabled, the user's groups are set to exactly what is listed." },
+        { "id": "user_shell", "label": "Login shell", "type": "text", "required": false, "defaultValue": "/bin/bash" },
+        { "id": "user_home", "label": "Home directory", "type": "text", "required": false, "placeholder": "/home/deploy" },
+        { "id": "create_home", "label": "Create home directory", "type": "toggle", "required": false, "defaultValue": "true" },
+        { "id": "system_user", "label": "System user", "type": "toggle", "required": false, "defaultValue": "false", "help": "System users are assigned UIDs below 1000 and have no home directory by default." },
+        { "id": "password_lock", "label": "Lock password (SSH-only)", "type": "toggle", "required": false, "defaultValue": "true", "help": "Disables password login. User can only authenticate via SSH key." },
+        { "id": "comment", "label": "Comment (GECOS)", "type": "text", "required": false, "placeholder": "Deploy automation user" },
+        { "id": "when_condition", "label": "When condition", "type": "text", "required": false },
+        { "id": "tags", "label": "Tags", "type": "text", "required": false, "placeholder": "users" },
+        { "id": "ignore_errors", "label": "Ignore errors", "type": "toggle", "required": false, "defaultValue": "false" }
       ]
     },
     {
@@ -125,30 +194,87 @@
       "repeatable": true,
       "maxInstances": 10,
       "fields": [
-        { "id": "task_name", "label": "Task name", "type": "text", "required": true, "placeholder": "Clone application repo" },
-        { "id": "repo_url", "label": "Repository URL", "type": "text", "required": true, "placeholder": "https://github.com/org/repo.git" },
-        { "id": "dest", "label": "Destination path", "type": "text", "required": true, "placeholder": "/var/app" },
-        { "id": "version", "label": "Branch / tag / commit", "type": "text", "required": true, "defaultValue": "main" },
-        { "id": "force_update", "label": "Force (overwrite local changes)", "type": "select", "required": true, "defaultValue": "false", "options": ["false","true"] },
-        { "id": "depth", "label": "Clone depth (0 = full clone)", "type": "text", "required": false, "defaultValue": "0" },
-        { "id": "accept_hostkey", "label": "Accept host key", "type": "select", "required": true, "defaultValue": "true", "options": ["true","false"] }
+        { "id": "task_name", "label": "Task name", "type": "text", "required": true, "placeholder": "Clone application repository" },
+        { "id": "git_repo", "label": "Repository URL", "type": "text", "required": true, "placeholder": "https://github.com/org/repo.git" },
+        { "id": "git_dest", "label": "Destination path", "type": "text", "required": true, "placeholder": "/var/app" },
+        { "id": "git_version", "label": "Branch / tag / commit", "type": "text", "required": true, "defaultValue": "main", "help": "Branch name, tag, or full commit SHA." },
+        { "id": "git_depth", "label": "Clone depth (0 = full)", "type": "text", "required": false, "defaultValue": "0", "help": "Shallow clone depth. Use 1 for CI/CD pipelines where history is not needed." },
+        { "id": "git_force", "label": "Force (overwrite local changes)", "type": "toggle", "required": false, "defaultValue": "false", "help": "Discard any local modifications before updating. Use with caution in production." },
+        { "id": "accept_hostkey", "label": "Accept SSH host key", "type": "toggle", "required": false, "defaultValue": "true", "help": "Automatically accept the remote SSH host key. Disable if you manage known_hosts manually." },
+        { "id": "git_key_file", "label": "SSH key file", "type": "text", "required": false, "placeholder": "/home/deploy/.ssh/id_rsa", "help": "Path to SSH private key for authenticating with private repositories." },
+        { "id": "register_var", "label": "Register output as", "type": "text", "required": false, "placeholder": "git_result" },
+        { "id": "when_condition", "label": "When condition", "type": "text", "required": false },
+        { "id": "notify", "label": "Notify handler", "type": "text", "required": false, "placeholder": "Restart app" },
+        { "id": "tags", "label": "Tags", "type": "text", "required": false, "placeholder": "deploy, git" },
+        { "id": "ignore_errors", "label": "Ignore errors", "type": "toggle", "required": false, "defaultValue": "false" }
       ]
     },
     {
-      "id": "tasks_template",
-      "label": "Tasks — Jinja2 Templates",
+      "id": "tasks_debug",
+      "label": "Tasks — Debug & Assert",
       "optional": true,
       "defaultEnabled": false,
       "repeatable": true,
       "maxInstances": 20,
       "fields": [
-        { "id": "task_name", "label": "Task name", "type": "text", "required": true, "placeholder": "Deploy app config" },
-        { "id": "src_template", "label": "Template source path", "type": "text", "required": true, "placeholder": "templates/app.conf.j2", "help": "Relative path to the .j2 template file in your role or playbook directory." },
-        { "id": "dest_path", "label": "Destination path", "type": "text", "required": true, "placeholder": "/etc/app/app.conf" },
-        { "id": "owner", "label": "Owner", "type": "text", "required": false, "placeholder": "root" },
-        { "id": "group", "label": "Group", "type": "text", "required": false, "placeholder": "root" },
-        { "id": "mode", "label": "Mode", "type": "text", "required": false, "placeholder": "0640" },
-        { "id": "backup", "label": "Backup existing file", "type": "select", "required": false, "defaultValue": "false", "options": ["false","true"] }
+        { "id": "task_name", "label": "Task name", "type": "text", "required": true, "placeholder": "Print app version" },
+        { "id": "debug_module", "label": "Module", "type": "select", "required": true, "defaultValue": "debug", "options": ["debug", "assert", "fail", "set_fact"], "help": "'debug' prints a message or variable. 'assert' validates a condition and fails if false. 'fail' always fails with a message. 'set_fact' sets a variable for use in later tasks." },
+        { "id": "msg", "label": "Message / expression", "type": "text", "required": false, "placeholder": "App version is {{ app_version }}", "help": "For debug: the message to print. For assert: the 'that' condition e.g. app_version is defined. For fail: the failure message. For set_fact: the variable name." },
+        { "id": "var", "label": "Variable to print (debug only)", "type": "text", "required": false, "placeholder": "ansible_facts", "help": "Print a specific variable. Shorthand for msg: '{{ varname }}'" },
+        { "id": "set_fact_key", "label": "Fact name (set_fact only)", "type": "text", "required": false, "placeholder": "app_env" },
+        { "id": "set_fact_value", "label": "Fact value (set_fact only)", "type": "text", "required": false, "placeholder": "production" },
+        { "id": "verbosity", "label": "Verbosity level (debug only)", "type": "select", "required": false, "defaultValue": "0", "options": ["0", "1", "2", "3"], "help": "Only print when ansible-playbook is run with at least this many -v flags." },
+        { "id": "when_condition", "label": "When condition", "type": "text", "required": false },
+        { "id": "tags", "label": "Tags", "type": "text", "required": false, "placeholder": "debug" }
+      ]
+    },
+    {
+      "id": "tasks_firewall",
+      "label": "Tasks — Firewall",
+      "optional": true,
+      "defaultEnabled": false,
+      "repeatable": true,
+      "maxInstances": 20,
+      "fields": [
+        { "id": "task_name", "label": "Task name", "type": "text", "required": true, "placeholder": "Allow HTTP traffic" },
+        { "id": "firewall_module", "label": "Firewall manager", "type": "select", "required": true, "defaultValue": "ufw", "options": ["ufw", "firewalld"], "help": "'ufw' is default on Ubuntu/Debian. 'firewalld' is default on RHEL/CentOS/Amazon Linux." },
+        { "id": "rule", "label": "Rule (ufw)", "type": "select", "required": false, "defaultValue": "allow", "options": ["allow", "deny", "reject", "limit"], "help": "UFW rule type. 'limit' applies rate limiting (useful against brute force)." },
+        { "id": "port", "label": "Port", "type": "text", "required": false, "placeholder": "80", "help": "Port number or service name e.g. 80, 443, ssh, http" },
+        { "id": "proto", "label": "Protocol", "type": "select", "required": false, "defaultValue": "tcp", "options": ["tcp", "udp", "any"] },
+        { "id": "from_ip", "label": "From IP / CIDR", "type": "text", "required": false, "placeholder": "10.0.0.0/8", "help": "Restrict rule to traffic from this source. Leave blank for any source." },
+        { "id": "to_ip", "label": "To IP / CIDR", "type": "text", "required": false, "placeholder": "0.0.0.0/0" },
+        { "id": "fw_state", "label": "UFW state", "type": "select", "required": false, "defaultValue": "enabled", "options": ["enabled", "disabled", "reloaded", "reset"], "help": "Overall UFW state. Set once with an 'enabled' rule, then manage individual port rules." },
+        { "id": "firewalld_service", "label": "Service (firewalld)", "type": "text", "required": false, "placeholder": "http", "help": "Named firewalld service. Alternatively set port directly." },
+        { "id": "firewalld_zone", "label": "Zone (firewalld)", "type": "text", "required": false, "defaultValue": "public" },
+        { "id": "firewalld_permanent", "label": "Permanent (firewalld)", "type": "toggle", "required": false, "defaultValue": "true" },
+        { "id": "firewalld_state", "label": "State (firewalld)", "type": "select", "required": false, "defaultValue": "enabled", "options": ["enabled", "disabled"] },
+        { "id": "when_condition", "label": "When condition", "type": "text", "required": false, "placeholder": "ansible_os_family == 'Debian'" },
+        { "id": "tags", "label": "Tags", "type": "text", "required": false, "placeholder": "firewall, security" }
+      ]
+    },
+    {
+      "id": "tasks_docker",
+      "label": "Tasks — Docker",
+      "optional": true,
+      "defaultEnabled": false,
+      "repeatable": true,
+      "maxInstances": 20,
+      "fields": [
+        { "id": "task_name", "label": "Task name", "type": "text", "required": true, "placeholder": "Run app container" },
+        { "id": "docker_module", "label": "Module", "type": "select", "required": true, "defaultValue": "docker_container", "options": ["docker_container", "docker_image", "docker_network", "docker_volume", "docker_compose"], "help": "Requires community.docker collection: ansible-galaxy collection install community.docker" },
+        { "id": "container_name", "label": "Container name", "type": "text", "required": false, "placeholder": "app" },
+        { "id": "image", "label": "Image", "type": "text", "required": false, "placeholder": "nginx:latest", "help": "Docker image name and tag." },
+        { "id": "docker_state", "label": "State", "type": "select", "required": false, "defaultValue": "started", "options": ["started", "stopped", "present", "absent", "restarted"], "help": "'started' ensures container is running. 'present' creates but does not start." },
+        { "id": "ports", "label": "Port mappings", "type": "text", "required": false, "placeholder": "80:80, 443:443", "help": "Comma-separated host:container port mappings." },
+        { "id": "volumes", "label": "Volume mounts", "type": "textarea", "required": false, "placeholder": "/var/app/data:/data\n/var/app/config:/etc/app:ro", "help": "One volume mount per line in host:container[:options] format." },
+        { "id": "env_vars", "label": "Environment variables", "type": "textarea", "required": false, "placeholder": "APP_ENV=production\nDB_HOST=db.internal", "help": "One KEY=VALUE per line." },
+        { "id": "networks", "label": "Networks", "type": "text", "required": false, "placeholder": "app_network", "help": "Docker network name to attach the container to." },
+        { "id": "restart_policy", "label": "Restart policy", "type": "select", "required": false, "defaultValue": "unless-stopped", "options": ["no", "always", "unless-stopped", "on-failure"] },
+        { "id": "pull_image", "label": "Pull image before run", "type": "toggle", "required": false, "defaultValue": "true" },
+        { "id": "compose_file", "label": "Compose file path (docker_compose)", "type": "text", "required": false, "placeholder": "/var/app/docker-compose.yml" },
+        { "id": "when_condition", "label": "When condition", "type": "text", "required": false },
+        { "id": "tags", "label": "Tags", "type": "text", "required": false, "placeholder": "docker, containers" },
+        { "id": "ignore_errors", "label": "Ignore errors", "type": "toggle", "required": false, "defaultValue": "false" }
       ]
     },
     {
@@ -159,16 +285,19 @@
       "repeatable": true,
       "maxInstances": 10,
       "fields": [
-        { "id": "task_name", "label": "Task name", "type": "text", "required": true, "placeholder": "Schedule daily backup" },
-        { "id": "cron_name", "label": "Cron job name", "type": "text", "required": true, "placeholder": "daily_backup", "help": "Unique identifier for this cron job. Used to manage idempotency." },
-        { "id": "minute", "label": "Minute", "type": "text", "required": true, "defaultValue": "0", "placeholder": "0" },
-        { "id": "hour", "label": "Hour", "type": "text", "required": true, "defaultValue": "2", "placeholder": "2" },
-        { "id": "day", "label": "Day of month", "type": "text", "required": true, "defaultValue": "*" },
-        { "id": "month", "label": "Month", "type": "text", "required": true, "defaultValue": "*" },
-        { "id": "weekday", "label": "Weekday (0=Sun)", "type": "text", "required": true, "defaultValue": "*" },
+        { "id": "task_name", "label": "Task name", "type": "text", "required": true, "placeholder": "Schedule nightly backup" },
+        { "id": "cron_name", "label": "Cron job identifier", "type": "text", "required": true, "placeholder": "nightly_backup", "help": "Unique name used for idempotency. Ansible tracks jobs by this name." },
+        { "id": "cron_minute", "label": "Minute", "type": "text", "required": true, "defaultValue": "0" },
+        { "id": "cron_hour", "label": "Hour", "type": "text", "required": true, "defaultValue": "2" },
+        { "id": "cron_day", "label": "Day of month", "type": "text", "required": true, "defaultValue": "*" },
+        { "id": "cron_month", "label": "Month", "type": "text", "required": true, "defaultValue": "*" },
+        { "id": "cron_weekday", "label": "Weekday (0=Sun)", "type": "text", "required": true, "defaultValue": "*" },
         { "id": "cron_job", "label": "Command", "type": "text", "required": true, "placeholder": "/usr/local/bin/backup.sh >> /var/log/backup.log 2>&1" },
         { "id": "cron_user", "label": "Run as user", "type": "text", "required": true, "defaultValue": "root" },
-        { "id": "cron_state", "label": "State", "type": "select", "required": true, "defaultValue": "present", "options": ["present","absent"] }
+        { "id": "cron_state", "label": "State", "type": "select", "required": true, "defaultValue": "present", "options": ["present", "absent"] },
+        { "id": "cron_disabled", "label": "Disabled (comment out)", "type": "toggle", "required": false, "defaultValue": "false", "help": "Keep the cron entry but comment it out — useful for temporarily disabling." },
+        { "id": "when_condition", "label": "When condition", "type": "text", "required": false },
+        { "id": "tags", "label": "Tags", "type": "text", "required": false, "placeholder": "cron, scheduled" }
       ]
     },
     {
@@ -179,9 +308,13 @@
       "repeatable": true,
       "maxInstances": 20,
       "fields": [
-        { "id": "handler_name", "label": "Handler name", "type": "text", "required": true, "placeholder": "Restart nginx", "help": "Tasks notify handlers by this name using 'notify: Handler name'." },
-        { "id": "service_name", "label": "Service name", "type": "text", "required": true, "placeholder": "nginx" },
-        { "id": "handler_state", "label": "State", "type": "select", "required": true, "defaultValue": "restarted", "options": ["restarted","reloaded","stopped","started"] }
+        { "id": "handler_name", "label": "Handler name", "type": "text", "required": true, "placeholder": "Restart nginx", "help": "Tasks reference handlers by this exact name in their 'notify' field." },
+        { "id": "handler_module", "label": "Module", "type": "select", "required": true, "defaultValue": "service", "options": ["service", "systemd", "command", "shell", "debug"], "help": "'service' and 'systemd' are most common. Use 'command'/'shell' for custom restart logic." },
+        { "id": "handler_service", "label": "Service name", "type": "text", "required": false, "placeholder": "nginx", "help": "Required for service and systemd modules." },
+        { "id": "handler_state", "label": "State (service/systemd)", "type": "select", "required": false, "defaultValue": "restarted", "options": ["restarted", "reloaded", "stopped", "started"] },
+        { "id": "handler_daemon_reload", "label": "Daemon reload (systemd)", "type": "toggle", "required": false, "defaultValue": "false" },
+        { "id": "handler_command", "label": "Command (command/shell)", "type": "text", "required": false, "placeholder": "systemctl reload-or-restart app" },
+        { "id": "listen", "label": "Listen (alias)", "type": "text", "required": false, "placeholder": "restart web services", "help": "Multiple handlers can listen to the same topic. Tasks notify the topic and all listening handlers run." }
       ]
     },
     {
@@ -192,9 +325,26 @@
       "repeatable": true,
       "maxInstances": 20,
       "fields": [
-        { "id": "role_name", "label": "Role name", "type": "text", "required": true, "placeholder": "geerlingguy.nginx", "help": "Local role name or Galaxy role in the format author.role_name." },
-        { "id": "role_become", "label": "Become", "type": "select", "required": true, "defaultValue": "false", "options": ["false","true"] },
-        { "id": "role_vars", "label": "Role variables", "type": "textarea", "required": false, "placeholder": "nginx_listen_port: 80\nnginx_worker_processes: auto", "help": "YAML key: value format, one per line." }
+        { "id": "role_name", "label": "Role name", "type": "text", "required": true, "placeholder": "geerlingguy.nginx", "help": "Local role name or Ansible Galaxy role in the format namespace.role_name. Install Galaxy roles with: ansible-galaxy install geerlingguy.nginx" },
+        { "id": "role_become", "label": "Become", "type": "toggle", "required": false, "defaultValue": "false" },
+        { "id": "role_vars", "label": "Role variables", "type": "textarea", "required": false, "placeholder": "nginx_listen_port: 80\nnginx_worker_processes: auto", "help": "YAML key: value pairs, one per line. These override the role's defaults." },
+        { "id": "when_condition", "label": "When condition", "type": "text", "required": false, "placeholder": "ansible_os_family == 'Debian'" },
+        { "id": "tags", "label": "Tags", "type": "text", "required": false, "placeholder": "nginx, web" }
+      ]
+    },
+    {
+      "id": "post_tasks",
+      "label": "Post-Tasks",
+      "optional": true,
+      "defaultEnabled": false,
+      "repeatable": true,
+      "maxInstances": 10,
+      "fields": [
+        { "id": "task_name", "label": "Task name", "type": "text", "required": true, "placeholder": "Verify service is running" },
+        { "id": "module", "label": "Module", "type": "select", "required": true, "defaultValue": "debug", "options": ["debug", "assert", "command", "shell", "uri", "wait_for"], "help": "Post-tasks run after all roles and the main tasks block. Commonly used for smoke tests and notifications." },
+        { "id": "command", "label": "Command / message / URL", "type": "text", "required": true, "placeholder": "systemctl is-active nginx" },
+        { "id": "register_var", "label": "Register output as", "type": "text", "required": false, "placeholder": "verify_result" },
+        { "id": "when_condition", "label": "When condition", "type": "text", "required": false }
       ]
     }
   ]
