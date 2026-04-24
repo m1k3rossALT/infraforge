@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -28,13 +29,11 @@ public class ProviderController {
         this.renderer = renderer;
     }
 
-    /** List all registered providers — used by the frontend tab bar. */
     @GetMapping("/providers")
     public List<ProviderSummary> listProviders() {
         return registry.listSummaries();
     }
 
-    /** Full schema for a provider — used to render the dynamic form. */
     @GetMapping("/providers/{id}/schema")
     public ResponseEntity<ProviderSchema> getSchema(@PathVariable String id) {
         return registry.findById(id)
@@ -42,48 +41,52 @@ public class ProviderController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    /**
-     * Generate a template from user-supplied field values.
-     * Returns plain text — the rendered IaC file content.
-     */
     @PostMapping("/providers/{id}/generate")
     public ResponseEntity<String> generate(
             @PathVariable String id,
             @RequestBody GenerateRequest request) {
 
-        if (!registry.findById(id).isPresent()) {
+        if (registry.findById(id).isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
         try {
-            // Convert String values to Object map for FreeMarker data model
-            Map<String, Object> model = new HashMap<>(request.getValues());
+            // Build FreeMarker data model from section-based request
+            Map<String, Object> model = new HashMap<>();
+            Map<String, Object> sectionsModel = new LinkedHashMap<>();
+
+            if (request.getSections() != null) {
+                for (Map.Entry<String, GenerateRequest.SectionData> entry : request.getSections().entrySet()) {
+                    Map<String, Object> sectionMap = new HashMap<>();
+                    sectionMap.put("enabled", entry.getValue().isEnabled());
+                    sectionMap.put("instances", entry.getValue().getInstances() != null
+                            ? entry.getValue().getInstances()
+                            : List.of());
+                    sectionsModel.put(entry.getKey(), sectionMap);
+                }
+            }
+            model.put("sections", sectionsModel);
+
             String output = renderer.render(id, model);
             return ResponseEntity.ok()
                     .header("Content-Type", "text/plain; charset=UTF-8")
                     .body(output);
+
         } catch (Exception e) {
-            log.error("[ProviderController] Template rendering failed for provider '{}': {}", id, e.getMessage());
+            log.error("[ProviderController] Render failed for provider '{}': {}", id, e.getMessage());
             return ResponseEntity.internalServerError()
                     .body("Template rendering error: " + e.getMessage());
         }
     }
 
-    /**
-     * Reserved endpoint for future AI-powered field suggestions.
-     * Returns empty for now — frontend should handle this gracefully.
-     */
+    /** Reserved — AI field suggestions. No-op until Phase 4. */
     @PostMapping("/providers/{id}/suggest")
     public ResponseEntity<Map<String, String>> suggest(@PathVariable String id) {
         return ResponseEntity.ok(Map.of());
     }
 
-    /** Standard health check. */
     @GetMapping("/health")
     public Map<String, String> health() {
-        return Map.of(
-            "status", "ok",
-            "version", "0.1.0"
-        );
+        return Map.of("status", "ok", "version", "0.1.0");
     }
 }

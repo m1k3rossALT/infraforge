@@ -1,4 +1,4 @@
-import type { FormValues, ProviderSchema, ProviderSummary } from '../types/schema'
+import type { FormState, ProviderSchema, ProviderSummary } from '../types/schema'
 
 const BASE = '/api'
 
@@ -21,10 +21,12 @@ export const api = {
   getSchema: (providerId: string): Promise<ProviderSchema> =>
     request(`/providers/${providerId}/schema`),
 
-  generate: (providerId: string, values: FormValues): Promise<string> =>
+  // FormState shape matches the backend GenerateRequest exactly.
+  // We wrap it in { sections: ... } as the backend expects.
+  generate: (providerId: string, state: FormState): Promise<string> =>
     requestText(`/providers/${providerId}/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ values }),
+      body: JSON.stringify({ sections: state }),
     }),
 }

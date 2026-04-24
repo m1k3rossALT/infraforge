@@ -1,4 +1,4 @@
-export type FieldType = 'text' | 'select' | 'textarea'
+export type FieldType = 'text' | 'select' | 'textarea' | 'toggle' | 'number'
 
 export interface Field {
   id: string
@@ -14,6 +14,10 @@ export interface Field {
 export interface Section {
   id: string
   label: string
+  optional: boolean
+  defaultEnabled: boolean
+  repeatable: boolean
+  maxInstances: number
   fields: Field[]
 }
 
@@ -30,4 +34,14 @@ export interface ProviderSummary {
   label: string
 }
 
-export type FormValues = Record<string, string>
+// Per-instance field values (flat map of fieldId → string)
+export type InstanceValues = Record<string, string>
+
+// State for one section: enabled flag + list of instances
+export interface SectionState {
+  enabled: boolean
+  instances: InstanceValues[]
+}
+
+// Full form state: sectionId → SectionState
+export type FormState = Record<string, SectionState>
