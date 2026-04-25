@@ -1,0 +1,23 @@
+# ─── Production profile ────────────────────────────────────────────────────
+# Active when: SPRING_PROFILES_ACTIVE=prod
+# Characteristics: minimal logging, restricted actuator, PostgreSQL (Phase 3c)
+
+spring:
+  application:
+    name: infraforge
+
+logging:
+  level:
+    com.infraforge: INFO
+    org.springframework: WARN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # Only expose health and info in production
+        include: health, info
+  endpoint:
+    health:
+      # Never expose internal health details publicly
+      show-details: never

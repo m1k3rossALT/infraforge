@@ -5,6 +5,10 @@ server:
     max-http-form-post-size: 2MB
 
 spring:
+  application:
+    name: infraforge
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
   lifecycle:
     timeout-per-shutdown-phase: 20s
   freemarker:
@@ -24,6 +28,16 @@ infraforge:
   cors:
     allowed-origins: ${INFRAFORGE_CORS_ORIGINS:http://localhost:3000,http://localhost:5173}
 
+# Actuator base config — profile configs extend this
+management:
+  endpoints:
+    web:
+      base-path: /actuator
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
 logging:
   level:
-    com.infraforge: DEBUG
+    root: WARN

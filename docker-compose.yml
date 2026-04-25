@@ -9,9 +9,13 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - SPRING_PROFILES_ACTIVE=default
+      - SPRING_PROFILES_ACTIVE=dev
+      - INFRAFORGE_CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+    volumes:
+      # Mount logs directory so log files are accessible on the host
+      - ./logs:/app/logs
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -32,3 +36,4 @@ services:
 # Kubernetes note: when moving to k8s, replace this compose file with
 # Helm chart values. Each service maps 1:1 to a Deployment + Service.
 # The nginx proxy_pass url becomes a k8s ClusterIP service name.
+# The logs volume becomes a PersistentVolumeClaim.

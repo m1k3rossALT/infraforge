@@ -1,0 +1,22 @@
+# ─── Development profile ───────────────────────────────────────────────────
+# Active when: SPRING_PROFILES_ACTIVE=dev
+# Characteristics: verbose logging, detailed errors, H2 in-memory DB (Phase 3c)
+
+spring:
+  application:
+    name: infraforge-dev
+
+logging:
+  level:
+    com.infraforge: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, loggers
+  endpoint:
+    health:
+      show-details: always
