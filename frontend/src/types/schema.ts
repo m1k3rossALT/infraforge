@@ -45,3 +45,25 @@ export interface SectionState {
 
 // Full form state: sectionId → SectionState
 export type FormState = Record<string, SectionState>
+
+// ─── Template management types ───────────────────────────────────────────────
+
+export interface TemplateSummary {
+  id: string
+  name: string
+  providerId: string
+  description?: string
+  tags?: string[]
+  updatedAt: string
+}
+
+export interface SavedTemplate {
+  id: string
+  name: string
+  providerId: string
+  formState: FormState
+  description?: string
+  tags?: string[]
+  updatedAt: string
+  generatedAt: string
+}
