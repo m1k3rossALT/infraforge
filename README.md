@@ -176,7 +176,6 @@ const projectName = "${proj.project_name}";
 
 | Phase | Status | Scope |
 |---|---|---|
-# Change to:
 | 1 | ✅ Complete | Terraform AWS builder, live preview, Docker |
 | 2 | ✅ Complete | Ansible (17 sections), Vagrant (19 sections), full provider coverage |
 | 3 | Planned | Save/load templates, local file management, export as zip |
