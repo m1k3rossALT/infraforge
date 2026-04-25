@@ -4,3 +4,6 @@ backend/target/
 # Log files — folder is tracked via .gitkeep, contents are not
 logs/*.log
 logs/*.log.gz
+
+# PostgreSQL data volume (managed by Docker)
+postgres_data/
