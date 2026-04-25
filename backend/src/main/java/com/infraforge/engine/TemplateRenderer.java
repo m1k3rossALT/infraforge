@@ -15,13 +15,11 @@ import java.util.Map;
  * Thin FreeMarker wrapper. The controller builds the model; this class
  * loads the provider template and renders it.
  *
- * Template path convention: classpath:/providers/{providerId}/template.ftl
- * Model key contract: whatever the controller puts in the map is accessible
- * in the template. Current contract: model has a single "sections" key whose
- * value is a Map<sectionId, { enabled, instances[] }>.
+ * Security: provider ID is validated as a safe alphanumeric identifier before
+ * being used in a file path — prevents directory traversal attacks.
  *
- * AI hook point (Phase 4): insert a pre-render enrichment step here that
- * can add AI-suggested values to the model before FreeMarker processes it.
+ * AI hook point (Phase 4): insert a pre-render enrichment step here to add
+ * AI-suggested values to the model before FreeMarker processes it.
  */
 @Component
 public class TemplateRenderer {
@@ -35,6 +33,11 @@ public class TemplateRenderer {
     }
 
     public String render(String providerId, Map<String, Object> model) throws IOException, TemplateException {
+        // Prevent directory traversal: provider ID must be alphanumeric + hyphens/underscores only
+        if (providerId == null || !providerId.matches("^[a-zA-Z0-9_-]{1,64}$")) {
+            throw new IllegalArgumentException("Invalid provider ID: " + providerId);
+        }
+
         String templatePath = "providers/" + providerId + "/template.ftl";
         Template template = cfg.getTemplate(templatePath);
         StringWriter writer = new StringWriter();

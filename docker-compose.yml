@@ -1,6 +1,25 @@
 version: '3.9'
 
 services:
+
+  db:
+    image: postgres:16-alpine
+    container_name: infraforge-db
+    environment:
+      POSTGRES_DB: infraforge
+      POSTGRES_USER: infraforge
+      POSTGRES_PASSWORD: infraforge
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U infraforge -d infraforge"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
@@ -9,9 +28,18 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - SPRING_PROFILES_ACTIVE=default
+      - SPRING_PROFILES_ACTIVE=dev
+      - INFRAFORGE_CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+      - DB_URL=jdbc:postgresql://db:5432/infraforge
+      - DB_USERNAME=infraforge
+      - DB_PASSWORD=infraforge
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -29,6 +57,10 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-# Kubernetes note: when moving to k8s, replace this compose file with
-# Helm chart values. Each service maps 1:1 to a Deployment + Service.
-# The nginx proxy_pass url becomes a k8s ClusterIP service name.
+volumes:
+  postgres_data:
+    driver: local
+
+# Kubernetes note: postgres_data volume becomes a PersistentVolumeClaim.
+# Each service maps 1:1 to a Deployment + Service.
+# DB credentials move to a Kubernetes Secret.
