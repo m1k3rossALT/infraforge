@@ -1,9 +1,22 @@
-backend/target/
-backend/target/
-
 # Log files — folder is tracked via .gitkeep, contents are not
 logs/*.log
 logs/*.log.gz
 
 # PostgreSQL data volume (managed by Docker)
 postgres_data/
+
+# Backend
+backend/target/
+*.class
+*.jar
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# System
+.DS_Store
+*.env
+
+# OWASP dependency check report output (generated on demand)
+backend/target/dependency-check-report.*

@@ -44,7 +44,6 @@
     <dependency>
       <groupId>org.flywaydb</groupId>
       <artifactId>flyway-core</artifactId>
-      <version>9.22.3</version>
     </dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
@@ -61,6 +60,26 @@
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+      <!--
+        OWASP Dependency Check - scans all dependencies against the NVD database.
+        Run manually: mvn dependency-check:check
+        Fails if CVSS score >= 7.0 (high/critical).
+        Report at: target/dependency-check-report.html
+        Suppress false positives in: dependency-check-suppressions.xml
+      -->
+      <plugin>
+        <groupId>org.owasp</groupId>
+        <artifactId>dependency-check-maven</artifactId>
+        <version>9.2.0</version>
+        <configuration>
+          <failBuildOnCVSS>7</failBuildOnCVSS>
+          <suppressionFile>dependency-check-suppressions.xml</suppressionFile>
+          <formats>
+            <format>HTML</format>
+            <format>JSON</format>
+          </formats>
+        </configuration>
       </plugin>
     </plugins>
   </build>
