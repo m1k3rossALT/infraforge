@@ -3,14 +3,399 @@
 <#assign vm = s.vm.instances[0]>
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
+<#-- ─── Required plugins ─────────────────────────────────────── -->
+<#if s.vagrant_plugins?? && s.vagrant_plugins.enabled && s.vagrant_plugins.instances?has_content>
+
+<#list s.vagrant_plugins.instances as plugin>
+<#if plugin.plugin_name?has_content>
+unless Vagrant.has_plugin?("${plugin.plugin_name}")
+  system("vagrant plugin install ${plugin.plugin_name}<#if plugin.plugin_version?has_content> --plugin-version '${plugin.plugin_version}'</#if>")
+  exec "vagrant #{ARGV.join(' ')}"
+end
+</#if>
+</#list>
+</#if>
 
 Vagrant.configure("2") do |config|
-<#-- ─── Multi-machine configuration ──────────────────────────── -->
+<#-- ─── Box ───────────────────────────────────────────────────── -->
+
+  config.vm.box     = "${vm.box!"ubuntu/jammy64"}"
+<#if vm.box_url?has_content>
+  config.vm.box_url = "${vm.box_url}"
+</#if>
+<#if vm.box_version?has_content>
+  config.vm.box_version = "${vm.box_version}"
+</#if>
+  config.vm.box_check_update = ${vm.box_check_update!"true"}
+<#if vm.hostname?has_content>
+  config.vm.hostname = "${vm.hostname}"
+</#if>
+  config.vm.define "${vm.vm_name!"default"}"<#if s.multi_machine?? && s.multi_machine.enabled && s.multi_machine.instances?has_content>, primary: true</#if>
+  config.vm.communicator = :${vm.communicator!"ssh"}
+  config.vm.boot_timeout = ${vm.boot_timeout!"300"}
+  config.vm.graceful_halt_timeout = ${vm.graceful_halt_timeout!"60"}
+<#if vm.post_up_message?has_content>
+
+  config.vm.post_up_message = <<~MSG
+${vm.post_up_message}
+  MSG
+</#if>
+<#-- ─── Port forwarding ──────────────────────────────────────── -->
+<#if s.network_forwarded?? && s.network_forwarded.enabled>
+<#list s.network_forwarded.instances as port>
+<#if port.guest_port?has_content && port.host_port?has_content>
+
+  config.vm.network "forwarded_port",
+    guest:        ${port.guest_port},
+    host:         ${port.host_port},
+    protocol:     "${port.protocol!"tcp"}"<#if port.host_ip?has_content>,
+    host_ip:      "${port.host_ip}"</#if>,
+    auto_correct: ${port.auto_correct!"false"}<#if port.port_id?has_content>,
+    id:           "${port.port_id}"</#if>
+</#if>
+</#list>
+</#if>
+<#-- ─── Private network ──────────────────────────────────────── -->
+<#if s.network_private?? && s.network_private.enabled>
+<#list s.network_private.instances as net>
+
+  config.vm.network "private_network"<#if net.network_type == "dhcp">,
+    type:        "dhcp"<#else>,
+    ip:          "${net.ip_address!"192.168.56.10"}"</#if><#if net.netmask?has_content>,
+    netmask:     "${net.netmask}"</#if><#if net.nic_type?has_content && net.nic_type != "">,
+    nic_type:    "${net.nic_type}"</#if>,
+    auto_config: ${net.auto_config!"true"}
+</#list>
+</#if>
+<#-- ─── Public (bridged) network ─────────────────────────────── -->
+<#if s.network_public?? && s.network_public.enabled>
+<#assign pub = s.network_public.instances[0]>
+
+  config.vm.network "public_network"<#if pub.bridge_interface?has_content>,
+    bridge: "${pub.bridge_interface}"</#if><#if pub.public_ip?has_content>,
+    ip:     "${pub.public_ip}"</#if>,
+    auto_config: ${pub.auto_config!"true"}<#if pub.use_dhcp_assigned_default_route == "true">,
+    use_dhcp_assigned_default_route: true</#if>
+</#if>
+<#-- ─── Synced folders ────────────────────────────────────────── -->
+<#if s.synced_folder?? && s.synced_folder.enabled>
+<#list s.synced_folder.instances as folder>
+<#if folder.host_path?has_content && folder.guest_path?has_content>
+
+  config.vm.synced_folder "${folder.host_path}", "${folder.guest_path}",
+    type:     "${folder.folder_type!"virtualbox"}",
+    disabled: ${folder.disabled!"false"}<#if folder.owner?has_content>,
+    owner:    "${folder.owner}"</#if><#if folder.group?has_content>,
+    group:    "${folder.group}"</#if><#if folder.mount_options?has_content>,
+    mount_options: ["${folder.mount_options?split(",")[0]?trim}"<#list folder.mount_options?split(",") as opt><#if opt?index != 0 && opt?trim?has_content>, "${opt?trim}"</#if></#list>]</#if><#if folder.folder_type == "rsync">,
+    rsync__auto:    ${folder.rsync_auto!"true"}<#if folder.rsync_exclude?has_content>,
+    rsync__exclude: [<#list folder.rsync_exclude?split(",") as ex><#if ex?trim?has_content>"${ex?trim}"<#sep>, </#sep></#if></#list>]</#if></#if>
+</#if>
+</#list>
+</#if>
+<#-- ─── SSH configuration ─────────────────────────────────────── -->
+<#if s.ssh?? && s.ssh.enabled>
+<#assign ssh = s.ssh.instances[0]>
+
+  config.ssh.username             = "${ssh.ssh_username!"vagrant"}"
+<#if ssh.ssh_password?has_content>
+  config.ssh.password             = "${ssh.ssh_password}"
+</#if>
+<#if ssh.ssh_private_key_path?has_content>
+  config.ssh.private_key_path     = "${ssh.ssh_private_key_path}"
+</#if>
+<#if ssh.ssh_host?has_content>
+  config.ssh.host                 = "${ssh.ssh_host}"
+</#if>
+  config.ssh.port                 = ${ssh.ssh_port!"22"}
+  config.ssh.insert_key           = ${ssh.ssh_insert_key!"true"}
+  config.ssh.forward_agent        = ${ssh.ssh_forward_agent!"false"}
+  config.ssh.forward_x11          = ${ssh.ssh_forward_x11!"false"}
+  config.ssh.keep_alive           = ${ssh.ssh_keep_alive!"true"}
+  config.ssh.connect_timeout      = ${ssh.ssh_connect_timeout!"15"}
+  config.ssh.shell                = "${ssh.ssh_shell!"bash -l"}"
+</#if>
+<#-- ─── VirtualBox provider ──────────────────────────────────── -->
+<#if s.provider_virtualbox?? && s.provider_virtualbox.enabled>
+<#assign vb = s.provider_virtualbox.instances[0]>
+
+  config.vm.provider "virtualbox" do |vbox|
+    vbox.name          = "${vb.vb_name!vm.vm_name!"vagrant"}"
+    vbox.memory        = ${vm.memory!"2048"}
+    vbox.cpus          = ${vm.cpus!"2"}
+    vbox.gui           = ${vb.vb_gui!"false"}
+    vbox.linked_clone  = ${vb.vb_linked_clone!"false"}
+<#if vb.vb_check_guest_additions?has_content>
+    vbox.check_guest_additions = ${vb.vb_check_guest_additions!"true"}
+</#if>
+    vbox.customize ["modifyvm", :id, "--natdnshostresolver1", "${vb.vb_natdnshostresolver!"on"}"]
+    vbox.customize ["modifyvm", :id, "--natdnsproxy1",        "${vb.vb_natdnsproxy!"on"}"]
+    vbox.customize ["modifyvm", :id, "--ioapic",              "${vb.vb_ioapic!"on"}"]
+<#if vb.vb_nested_virtualization == "true">
+    vbox.customize ["modifyvm", :id, "--nested-hw-virt",      "on"]
+</#if>
+<#if vb.vb_clipboard?has_content && vb.vb_clipboard != "disabled">
+    vbox.customize ["modifyvm", :id, "--clipboard-mode",      "${vb.vb_clipboard}"]
+</#if>
+<#if vb.vb_customize?has_content>
+<#list vb.vb_customize?split("\n") as line>
+<#if line?trim?has_content>
+    vbox.customize ${line?trim}
+</#if>
+</#list>
+</#if>
+  end
+<#else>
+
+  config.vm.provider "virtualbox" do |vbox|
+    vbox.memory = ${vm.memory!"2048"}
+    vbox.cpus   = ${vm.cpus!"2"}
+    vbox.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+  end
+</#if>
+<#-- ─── VMware provider ───────────────────────────────────────── -->
+<#if s.provider_vmware?? && s.provider_vmware.enabled>
+<#assign vmw = s.provider_vmware.instances[0]>
+
+  config.vm.provider "vmware_desktop" do |v|
+    v.vmx["displayName"]    = "${vmw.vmware_display_name!vm.vm_name!"vagrant"}"
+    v.vmx["memsize"]        = "${vmw.vmware_vmx_memsize!vm.memory!"2048"}"
+    v.vmx["numvcpus"]       = "${vmw.vmware_vmx_numvcpus!vm.cpus!"2"}"
+    v.gui                   = ${vmw.vmware_gui!"false"}
+    v.linked_clone          = ${vmw.vmware_linked_clone!"false"}
+<#if vmw.vmware_vmx_vhv_enable == "true">
+    v.vmx["vhv.enable"]     = "TRUE"
+</#if>
+<#if vmw.vmware_vmx_custom?has_content>
+<#list vmw.vmware_vmx_custom?split("\n") as line>
+<#if line?trim?has_content && line?contains("=")>
+    v.vmx["${line?keep_before("=")?trim}"] = "${line?keep_after("=")?trim}"
+</#if>
+</#list>
+</#if>
+  end
+</#if>
+<#-- ─── Hyper-V provider ─────────────────────────────────────── -->
+<#if s.provider_hyperv?? && s.provider_hyperv.enabled>
+<#assign hv = s.provider_hyperv.instances[0]>
+
+  config.vm.provider "hyperv" do |h|
+<#if hv.hyperv_vmname?has_content>
+    h.vmname      = "${hv.hyperv_vmname}"
+</#if>
+    h.cpus        = ${hv.hyperv_cpus!vm.cpus!"2"}
+    h.memory      = ${hv.hyperv_memory!vm.memory!"2048"}
+<#if hv.hyperv_maxmemory?has_content>
+    h.maxmemory   = ${hv.hyperv_maxmemory}
+</#if>
+    h.linked_clone = ${hv.hyperv_linked_clone!"false"}
+    h.auto_start_action = "${hv.hyperv_auto_start_action!"Nothing"}"
+    h.auto_stop_action  = "${hv.hyperv_auto_stop_action!"ShutDown"}"
+<#if hv.hyperv_enable_virtualization_extensions == "true">
+    h.enable_virtualization_extensions = true
+</#if>
+  end
+</#if>
+<#-- ─── Parallels provider ───────────────────────────────────── -->
+<#if s.provider_parallels?? && s.provider_parallels.enabled>
+<#assign par = s.provider_parallels.instances[0]>
+
+  config.vm.provider "parallels" do |p|
+<#if par.parallels_name?has_content>
+    p.name                = "${par.parallels_name}"
+</#if>
+    p.cpus                = ${par.parallels_cpus!vm.cpus!"2"}
+    p.memory              = ${par.parallels_memory!vm.memory!"2048"}
+    p.linked_clone        = ${par.parallels_linked_clone!"false"}
+    p.update_guest_tools  = ${par.parallels_update_guest_tools!"false"}
+<#if par.parallels_customize?has_content>
+<#list par.parallels_customize?split("\n") as line>
+<#if line?trim?has_content>
+    p.customize ${line?trim}
+</#if>
+</#list>
+</#if>
+  end
+</#if>
+<#-- ─── File upload provisioner ─────────────────────────────── -->
+<#if s.provision_file?? && s.provision_file.enabled>
+<#list s.provision_file.instances as prov>
+<#if prov.file_source?has_content && prov.file_destination?has_content>
+
+  config.vm.provision "file",
+    run:         "${prov.run!"once"}",
+    source:      "${prov.file_source}",
+    destination: "${prov.file_destination}"
+</#if>
+</#list>
+</#if>
+<#-- ─── Shell provisioner ────────────────────────────────────── -->
+<#if s.provision_shell?? && s.provision_shell.enabled>
+<#list s.provision_shell.instances as prov>
+
+  config.vm.provision "shell"<#if prov.provision_name?has_content>, name: "${prov.provision_name}"</#if>,
+    run:        "${prov.run!"once"}",
+    privileged: ${prov.privileged!"true"}<#if prov.reboot == "true">,
+    reboot:     true</#if><#if prov.upload_path?has_content>,
+    upload_path: "${prov.upload_path}"</#if><#if prov.shell_env?has_content>,
+    env: {
+<#list prov.shell_env?split("\n") as line>
+<#if line?trim?has_content && line?contains("=")>
+      "${line?keep_before("=")?trim}" => "${line?keep_after("=")?trim}",
+</#if>
+</#list>
+    }</#if><#if prov.shell_powershell_elevated_interactive == "true">,
+    powershell_elevated_interactive: true</#if><#if prov.shell_type == "path">,
+    path: "${prov.script_path!""}"<#if prov.script_args?has_content>,
+    args: "${prov.script_args}"</#if>
+<#else>,
+    inline: <<~SHELL
+${prov.inline_script!""}
+    SHELL
+</#if>
+</#list>
+</#if>
+<#-- ─── Ansible provisioner ──────────────────────────────────── -->
+<#if s.provision_ansible?? && s.provision_ansible.enabled>
+<#assign ap = s.provision_ansible.instances[0]>
+
+  config.vm.provision "${ap.ansible_type!"ansible"}" do |ansible|
+    ansible.playbook       = "${ap.playbook_path!"provisioning/playbook.yml"}"
+<#if ap.inventory_path?has_content>
+    ansible.inventory_path = "${ap.inventory_path}"
+</#if>
+    ansible.become         = ${ap.ansible_become!"false"}
+<#if ap.ansible_verbose?has_content && ap.ansible_verbose != "">
+    ansible.verbose        = "${ap.ansible_verbose}"
+</#if>
+<#if ap.ansible_tags?has_content>
+    ansible.tags           = "${ap.ansible_tags}"
+</#if>
+<#if ap.ansible_skip_tags?has_content>
+    ansible.skip_tags      = "${ap.ansible_skip_tags}"
+</#if>
+<#if ap.galaxy_role_file?has_content>
+    ansible.galaxy_role_file = "${ap.galaxy_role_file}"
+</#if>
+<#if ap.raw_arguments?has_content>
+    ansible.raw_arguments  = ["${ap.raw_arguments}"]
+</#if>
+<#if ap.extra_vars?has_content>
+    ansible.extra_vars = {
+<#list ap.extra_vars?split("\n") as line>
+<#if line?trim?has_content && line?contains(":")>
+      "${line?keep_before(":")?trim}" => "${line?keep_after(":")?trim?trim}",
+</#if>
+</#list>
+    }
+</#if>
+  end
+</#if>
+<#-- ─── Docker provisioner ───────────────────────────────────── -->
+<#if s.provision_docker?? && s.provision_docker.enabled>
+<#assign dp = s.provision_docker.instances[0]>
+
+  config.vm.provision "docker"<#if dp.docker_version?has_content && dp.docker_version != "latest">, version: "${dp.docker_version}"</#if> do |d|
+<#if dp.docker_images?has_content>
+<#list dp.docker_images?split("\n") as img>
+<#if img?trim?has_content>
+    d.pull_images "${img?trim}"
+</#if>
+</#list>
+</#if>
+<#if dp.docker_build_dir?has_content>
+    d.build_image "${dp.docker_build_dir}"<#if dp.docker_build_tag?has_content>, args: "-t ${dp.docker_build_tag}"</#if>
+</#if>
+<#if dp.docker_run_image?has_content>
+    d.run "${dp.docker_run_image}"<#if dp.docker_run_args?has_content>, args: "${dp.docker_run_args}"</#if>
+</#if>
+<#if dp.docker_compose_file?has_content>
+    d.run "docker-compose",
+      image: "docker/compose",
+      args:  "-v /vagrant:/vagrant -w /vagrant",
+      cmd:   "-f ${dp.docker_compose_file} up -d",
+      daemonize: false
+</#if>
+  end
+</#if>
+<#-- ─── Puppet provisioner ───────────────────────────────────── -->
+<#if s.provision_puppet?? && s.provision_puppet.enabled>
+<#assign pp = s.provision_puppet.instances[0]>
+
+  config.vm.provision "${pp.puppet_type!"puppet"}" do |puppet|
+<#if pp.puppet_type == "puppet_server">
+    puppet.puppet_server   = "${pp.puppet_server!"puppet"}"
+<#if pp.puppet_node_name?has_content>
+    puppet.puppet_node     = "${pp.puppet_node_name}"
+</#if>
+<#else>
+    puppet.manifests_path  = "${pp.puppet_manifests_path!"manifests"}"
+    puppet.manifest_file   = "${pp.puppet_manifest_file!"default.pp"}"
+<#if pp.puppet_modules_path?has_content>
+    puppet.module_path     = "${pp.puppet_modules_path}"
+</#if>
+<#if pp.puppet_hiera_config_path?has_content>
+    puppet.hiera_config_path = "${pp.puppet_hiera_config_path}"
+</#if>
+</#if>
+<#if pp.puppet_options?has_content>
+    puppet.options         = "${pp.puppet_options}"
+</#if>
+  end
+</#if>
+<#-- ─── Chef provisioner ─────────────────────────────────────── -->
+<#if s.provision_chef?? && s.provision_chef.enabled>
+<#assign ch = s.provision_chef.instances[0]>
+
+  config.vm.provision "${ch.chef_type!"chef_solo"}" do |chef|
+<#if ch.chef_type == "chef_client">
+    chef.chef_server_url   = "${ch.chef_server_url!""}"
+<#if ch.chef_node_name?has_content>
+    chef.node_name         = "${ch.chef_node_name}"
+</#if>
+<#else>
+    chef.cookbooks_path    = "${ch.chef_cookbooks_path!"cookbooks"}"
+<#if ch.chef_roles_path?has_content>
+    chef.roles_path        = "${ch.chef_roles_path}"
+</#if>
+<#if ch.chef_data_bags_path?has_content>
+    chef.data_bags_path    = "${ch.chef_data_bags_path}"
+</#if>
+</#if>
+<#if ch.chef_run_list?has_content>
+<#list ch.chef_run_list?split("\n") as item>
+<#if item?trim?has_content>
+    chef.add_recipe "${item?trim?remove_beginning("recipe[")?remove_ending("]")}"
+</#if>
+</#list>
+</#if>
+    chef.log_level         = :${ch.chef_log_level!"info"}
+  end
+</#if>
+<#-- ─── Triggers ─────────────────────────────────────────────── -->
+<#if s.triggers?? && s.triggers.enabled && s.triggers.instances?has_content>
+
+<#list s.triggers.instances as trigger>
+<#if trigger.trigger_command?has_content>
+  config.trigger.${trigger.trigger_timing!"after"} :${trigger.trigger_command!"up"} do |t|
+<#if trigger.trigger_info?has_content>
+    t.info = "${trigger.trigger_info}"
+</#if>
+<#if trigger.trigger_run_command?has_content>
+    t.run = { inline: "${trigger.trigger_run_command}" }
+<#elseif trigger.trigger_run_path?has_content>
+    t.run = { path: "${trigger.trigger_run_path}" }
+</#if>
+  end
+</#if>
+</#list>
+</#if>
+<#-- ─── Multi-machine definitions ───────────────────────────── -->
 <#if s.multi_machine?? && s.multi_machine.enabled && s.multi_machine.instances?has_content>
+
 <#list s.multi_machine.instances as m>
 <#if m.machine_name?has_content>
-
-  config.vm.define "${m.machine_name}" do |${m.machine_name}|
+  config.vm.define "${m.machine_name}"<#if m.machine_primary == "true">, primary: true</#if><#if m.machine_autostart == "false">, autostart: false</#if> do |${m.machine_name}|
     ${m.machine_name}.vm.box      = "${m.machine_box!"ubuntu/jammy64"}"
 <#if m.machine_hostname?has_content>
     ${m.machine_name}.vm.hostname = "${m.machine_hostname}"
@@ -24,206 +409,18 @@ Vagrant.configure("2") do |config|
 
     ${m.machine_name}.vm.provider "virtualbox" do |vb|
       vb.name   = "${m.machine_name}"
-      vb.memory = "${m.machine_memory!"2048"}"
-      vb.cpus   = "${m.machine_cpus!"2"}"
+      vb.memory = ${m.machine_memory!"1024"}
+      vb.cpus   = ${m.machine_cpus!"1"}
     end
-<#if m.shell_provision?has_content>
+<#if m.machine_shell_provision?has_content>
 
-    ${m.machine_name}.vm.provision "shell", inline: <<-SHELL
-      ${m.shell_provision}
+    ${m.machine_name}.vm.provision "shell", inline: <<~SHELL
+      ${m.machine_shell_provision}
     SHELL
 </#if>
   end
 </#if>
 </#list>
-<#else>
-<#-- ─── Single machine configuration ─────────────────────────── -->
-
-  # Box
-  config.vm.box     = "${vm.box!"ubuntu/jammy64"}"
-<#if vm.box_version?has_content>
-  config.vm.box_version = "${vm.box_version}"
-</#if>
-  config.vm.hostname = "${vm.hostname!vm.vm_name!"vagrant"}"
-
-  # VM identity
-  config.vm.define "${vm.vm_name!"default"}"
-<#-- ─── Forwarded Ports ─────────────────────────────────────── -->
-<#if s.network_forwarded?? && s.network_forwarded.enabled>
-<#list s.network_forwarded.instances as port>
-<#if port.guest_port?has_content && port.host_port?has_content>
-
-  config.vm.network "forwarded_port",
-    guest: ${port.guest_port},
-    host:  ${port.host_port}<#if port.protocol?has_content && port.protocol != "tcp">,
-    protocol: "${port.protocol}"</#if><#if port.host_ip?has_content>,
-    host_ip: "${port.host_ip}"</#if><#if port.auto_correct == "true">,
-    auto_correct: true</#if>
-</#if>
-</#list>
-</#if>
-<#-- ─── Private Network ───────────────────────────────────────── -->
-<#if s.network_private?? && s.network_private.enabled>
-<#assign priv = s.network_private.instances[0]>
-
-  config.vm.network "private_network"<#if priv.private_ip?has_content>,
-    ip: "${priv.private_ip}"<#else>,
-    type: "dhcp"</#if><#if priv.netmask?has_content>,
-    netmask: "${priv.netmask}"</#if>
-</#if>
-<#-- ─── Public Network ────────────────────────────────────────── -->
-<#if s.network_public?? && s.network_public.enabled>
-<#assign pub = s.network_public.instances[0]>
-
-  config.vm.network "public_network"<#if pub.bridge_interface?has_content>,
-    bridge: "${pub.bridge_interface}"</#if><#if pub.public_ip?has_content>,
-    ip: "${pub.public_ip}"</#if>
-</#if>
-<#-- ─── Synced Folders ─────────────────────────────────────────── -->
-<#if s.synced_folder?? && s.synced_folder.enabled>
-<#list s.synced_folder.instances as folder>
-<#if folder.host_path?has_content && folder.guest_path?has_content>
-
-  config.vm.synced_folder "${folder.host_path}", "${folder.guest_path}"<#if folder.sync_type?has_content>,
-    type: "${folder.sync_type}"</#if><#if folder.disabled == "true">,
-    disabled: true</#if><#if folder.create == "true">,
-    create: true</#if>
-</#if>
-</#list>
-</#if>
-<#-- ─── SSH Configuration ─────────────────────────────────────── -->
-<#if s.ssh?? && s.ssh.enabled>
-<#assign ssh = s.ssh.instances[0]>
-
-  config.ssh.username              = "${ssh.ssh_username!"vagrant"}"
-  config.ssh.insert_key            = ${ssh.insert_key!"true"}
-<#if ssh.private_key_path?has_content>
-  config.ssh.private_key_path      = "${ssh.private_key_path}"
-</#if>
-  config.ssh.forward_agent         = ${ssh.forward_agent!"false"}
-  config.ssh.forward_x11           = ${ssh.forward_x11!"false"}
-<#if ssh.connect_timeout?has_content>
-  config.ssh.connect_timeout       = ${ssh.connect_timeout}
-</#if>
-</#if>
-<#-- ─── VirtualBox Provider ───────────────────────────────────── -->
-<#if s.provider_virtualbox?? && s.provider_virtualbox.enabled>
-<#assign vbox = s.provider_virtualbox.instances[0]>
-
-  config.vm.provider "virtualbox" do |vb|
-    vb.name   = "${vbox.vb_name!vm.vm_name!"vagrant"}"
-    vb.memory = "${vm.memory!"2048"}"
-    vb.cpus   = ${vm.cpus!"2"}
-    vb.gui    = ${vbox.gui!"false"}
-<#if vbox.vb_customize?has_content>
-    # Custom VBoxManage flags
-<#list vbox.vb_customize?split("\n") as line>
-<#if line?trim?has_content>
-    vb.customize ${line?trim}
-</#if>
-</#list>
-</#if>
-<#if vbox.linked_clone == "true">
-    vb.linked_clone = true
-</#if>
-<#if vbox.check_guest_additions == "false">
-    vb.check_guest_additions = false
-</#if>
-  end
-<#else>
-
-  config.vm.provider "virtualbox" do |vb|
-    vb.memory = "${vm.memory!"2048"}"
-    vb.cpus   = ${vm.cpus!"2"}
-  end
-</#if>
-<#-- ─── VMware Provider ───────────────────────────────────────── -->
-<#if s.provider_vmware?? && s.provider_vmware.enabled>
-<#assign vmw = s.provider_vmware.instances[0]>
-
-  config.vm.provider "vmware_desktop" do |vmw|
-    vmw.vmx["displayName"] = "${vmw.vmx_display_name!vm.vm_name!"vagrant"}"
-    vmw.vmx["memsize"]     = "${vm.memory!"2048"}"
-    vmw.vmx["numvcpus"]    = "${vm.cpus!"2"}"
-    vmw.gui                = ${vmw.gui!"false"}
-<#if vmw.linked_clone == "true">
-    vmw.linked_clone       = true
-</#if>
-  end
-</#if>
-<#-- ─── Shell Provisioner ─────────────────────────────────────── -->
-<#if s.provision_shell?? && s.provision_shell.enabled>
-<#list s.provision_shell.instances as prov>
-<#if prov.inline_script?has_content>
-
-  config.vm.provision "shell"<#if prov.provision_name?has_content>, name: "${prov.provision_name}"</#if>,
-    privileged: ${prov.privileged!"true"},
-    inline: <<-SHELL
-      ${prov.inline_script}
-    SHELL
-<#elseif prov.script_path?has_content>
-
-  config.vm.provision "shell"<#if prov.provision_name?has_content>, name: "${prov.provision_name}"</#if>,
-    privileged: ${prov.privileged!"true"},
-    path: "${prov.script_path}"<#if prov.script_args?has_content>,
-    args: "${prov.script_args}"</#if>
-</#if>
-</#list>
-</#if>
-<#-- ─── Ansible Provisioner ───────────────────────────────────── -->
-<#if s.provision_ansible?? && s.provision_ansible.enabled>
-<#assign ap = s.provision_ansible.instances[0]>
-
-  config.vm.provision "ansible" do |ansible|
-    ansible.playbook       = "${ap.ansible_playbook!"playbook.yml"}"
-<#if ap.ansible_inventory?has_content>
-    ansible.inventory_path = "${ap.ansible_inventory}"
-</#if>
-    ansible.become         = ${ap.ansible_become!"false"}
-<#if ap.ansible_limit?has_content>
-    ansible.limit          = "${ap.ansible_limit}"
-</#if>
-<#if ap.ansible_extra_vars?has_content>
-    ansible.extra_vars = {
-<#list ap.ansible_extra_vars?split("\n") as line>
-<#if line?trim?has_content>
-      ${line?trim},
-</#if>
-</#list>
-    }
-</#if>
-    ansible.verbose        = ${ap.ansible_verbose!"false"}
-  end
-</#if>
-<#-- ─── File Provisioner ──────────────────────────────────────── -->
-<#if s.provision_file?? && s.provision_file.enabled>
-<#list s.provision_file.instances as prov>
-<#if prov.source?has_content && prov.destination?has_content>
-
-  config.vm.provision "file",
-    source:      "${prov.source}",
-    destination: "${prov.destination}"
-</#if>
-</#list>
-</#if>
-<#-- ─── Docker Provisioner ────────────────────────────────────── -->
-<#if s.provision_docker?? && s.provision_docker.enabled>
-<#assign dp = s.provision_docker.instances[0]>
-
-  config.vm.provision "docker" do |d|
-<#if dp.docker_images?has_content>
-<#list dp.docker_images?split("\n") as img>
-<#if img?trim?has_content>
-    d.pull_images "${img?trim}"
-</#if>
-</#list>
-</#if>
-<#if dp.docker_run_image?has_content>
-    d.run "${dp.docker_run_image}",
-      args: "${dp.docker_run_args!""}"
-</#if>
-  end
-</#if>
 </#if>
 
 end
