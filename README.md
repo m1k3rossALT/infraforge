@@ -83,9 +83,15 @@ infraforge/
 │   ├── src/main/resources/
 │   │   ├── application.yml
 │   │   └── providers/
-│   │       └── terraform/
-│   │           ├── schema.json     Field definitions, dropdowns, help text
-│   │           └── template.ftl    FreeMarker output template
+│   │       ├── terraform/
+│   │       │   ├── schema.json
+│   │       │   └── template.ftl
+│   │       ├── ansible/
+│   │       │   ├── schema.json
+│   │       │   └── template.ftl
+│   │       └── vagrant/
+│   │           ├── schema.json
+│   │           └── template.ftl
 │   └── Dockerfile
 ├── frontend/
 │   ├── src/
@@ -154,7 +160,10 @@ backend/src/main/resources/providers/pulumi/
 ```
 import * as pulumi from "@pulumi/pulumi";
 
-const projectName = "${project_name}";
+<#assign s = sections>
+<#assign proj = s.project.instances[0]>
+
+const projectName = "${proj.project_name}";
 ```
 
 4. Restart the backend. The new provider appears in the UI tab bar automatically.
@@ -167,8 +176,9 @@ const projectName = "${project_name}";
 
 | Phase | Status | Scope |
 |---|---|---|
-| 1 | ✅ Current | Terraform AWS builder, live preview, Docker |
-| 2 | Planned | Ansible playbook builder, Vagrant provider |
+# Change to:
+| 1 | ✅ Complete | Terraform AWS builder, live preview, Docker |
+| 2 | ✅ Complete | Ansible (17 sections), Vagrant (19 sections), full provider coverage |
 | 3 | Planned | Save/load templates, local file management, export as zip |
 | 4 | Future | AI-assisted field suggestions (hook points already in place) |
 | 5 | Future | Kubernetes deployment, multi-user support, template sharing |
