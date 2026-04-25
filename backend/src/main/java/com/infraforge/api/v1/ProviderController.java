@@ -1,10 +1,11 @@
-package com.infraforge.api;
+package com.infraforge.api.v1;
 
 import com.infraforge.engine.ProviderRegistry;
 import com.infraforge.engine.TemplateRenderer;
 import com.infraforge.model.GenerateRequest;
 import com.infraforge.model.ProviderSchema;
 import com.infraforge.model.ProviderSummary;
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -15,8 +16,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Provider API — v1.
+ * Migrated from /api/ to /api/v1/ as part of Phase 3e API versioning.
+ */
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/api/v1")
 public class ProviderController {
 
     private static final Logger log = LoggerFactory.getLogger(ProviderController.class);
@@ -44,14 +49,13 @@ public class ProviderController {
     @PostMapping("/providers/{id}/generate")
     public ResponseEntity<String> generate(
             @PathVariable String id,
-            @RequestBody GenerateRequest request) {
+            @Valid @RequestBody GenerateRequest request) {
 
         if (registry.findById(id).isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
         try {
-            // Build FreeMarker data model from section-based request
             Map<String, Object> model = new HashMap<>();
             Map<String, Object> sectionsModel = new LinkedHashMap<>();
 
@@ -87,6 +91,6 @@ public class ProviderController {
 
     @GetMapping("/health")
     public Map<String, String> health() {
-        return Map.of("status", "ok", "version", "0.1.0");
+        return Map.of("status", "ok", "version", "0.3.0");
     }
 }

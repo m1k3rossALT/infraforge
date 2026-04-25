@@ -120,9 +120,16 @@ export default function App() {
     setActiveProviderId(template.providerId)
     setTemplateId(template.id)
     setTemplateName(template.name)
-    // formState will be set after schema loads — store it temporarily
     setFormState(template.formState as FormState)
   }, [providers])
+
+  // Handle an imported template
+  const handleImportTemplate = useCallback((template: SavedTemplate) => {
+    setActiveProviderId(template.providerId)
+    setTemplateId(template.id)
+    setTemplateName(template.name)
+    setFormState(template.formState as FormState)
+  }, [])
 
   // Clear template (new document)
   const handleClearTemplate = () => {
@@ -156,6 +163,7 @@ export default function App() {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         onLoad={handleLoadTemplate}
+        onImport={handleImportTemplate}
       />
 
       {/* Top bar */}
