@@ -5,6 +5,7 @@ import com.infraforge.engine.ProviderRegistry;
 import com.infraforge.model.SaveTemplateRequest;
 import com.infraforge.model.Template;
 import com.infraforge.model.TemplateSummary;
+import com.infraforge.security.CurrentUser;
 import com.infraforge.service.TemplateService;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
@@ -30,7 +31,6 @@ public class TemplateController {
 
     private static final Logger log = LoggerFactory.getLogger(TemplateController.class);
 
-    // File extension → provider ID mapping for import detection
     private static final Map<String, String> EXT_TO_PROVIDER = Map.of(
         "tf",          "terraform",
         "yml",         "ansible",
@@ -50,16 +50,15 @@ public class TemplateController {
         this.objectMapper = objectMapper;
     }
 
-    /** List all templates — returns summaries only (no formState) */
     @GetMapping
     public List<TemplateSummary> listAll(@RequestParam(required = false) String providerId) {
+        UUID userId = CurrentUser.id().orElse(null);
         List<Template> templates = providerId != null
-                ? templateService.listByProvider(providerId)
-                : templateService.listAll();
+                ? templateService.listByProvider(providerId, userId)
+                : templateService.listAll(userId);
         return templates.stream().map(TemplateSummary::new).collect(Collectors.toList());
     }
 
-    /** Load a single template — includes full formState */
     @GetMapping("/{id}")
     public ResponseEntity<Template> getById(@PathVariable UUID id) {
         return templateService.findById(id)
@@ -67,49 +66,47 @@ public class TemplateController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    /** Create a new template */
     @PostMapping
     public ResponseEntity<Template> create(@Valid @RequestBody SaveTemplateRequest request) {
+        UUID userId = CurrentUser.id().orElse(null);
         Template saved = templateService.save(null, request.getName(), request.getProviderId(),
-                request.getFormState(), request.getDescription(), request.getTags());
+                request.getFormState(), request.getDescription(), request.getTags(), userId);
         return ResponseEntity.created(URI.create("/api/v1/templates/" + saved.getId())).body(saved);
     }
 
-    /** Update an existing template (auto-save) */
     @PutMapping("/{id}")
     public ResponseEntity<Template> update(@PathVariable UUID id,
                                             @Valid @RequestBody SaveTemplateRequest request) {
         if (templateService.findById(id).isEmpty()) return ResponseEntity.notFound().build();
+        UUID userId = CurrentUser.id().orElse(null);
         Template saved = templateService.save(id, request.getName(), request.getProviderId(),
-                request.getFormState(), request.getDescription(), request.getTags());
+                request.getFormState(), request.getDescription(), request.getTags(), userId);
         return ResponseEntity.ok(saved);
     }
 
-    /** Delete a template */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
-        return templateService.delete(id)
-                ? ResponseEntity.noContent().build()
-                : ResponseEntity.notFound().build();
+        UUID userId = CurrentUser.id().orElse(null);
+        try {
+            return templateService.delete(id, userId)
+                    ? ResponseEntity.noContent().build()
+                    : ResponseEntity.notFound().build();
+        } catch (SecurityException e) {
+            return ResponseEntity.status(403).build();
+        }
     }
 
-    /** Duplicate a template */
     @PostMapping("/{id}/duplicate")
     public ResponseEntity<Template> duplicate(@PathVariable UUID id) {
+        UUID userId = CurrentUser.id().orElse(null);
         try {
-            Template copy = templateService.duplicate(id);
+            Template copy = templateService.duplicate(id, userId);
             return ResponseEntity.created(URI.create("/api/v1/templates/" + copy.getId())).body(copy);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         }
     }
 
-    /**
-     * Export a template as a zip file.
-     * The zip contains:
-     *   - main.<ext>        the generated template file (raw formState serialized as JSON for now)
-     *   - metadata.json     template name, provider, dates, tags
-     */
     @GetMapping("/{id}/export")
     public ResponseEntity<byte[]> export(@PathVariable UUID id) {
         Optional<Template> opt = templateService.findById(id);
@@ -121,41 +118,31 @@ public class TemplateController {
                 .orElse("txt");
 
         try {
-            // Build metadata.json
             Map<String, Object> metadata = new LinkedHashMap<>();
             metadata.put("id", template.getId().toString());
             metadata.put("name", template.getName());
             metadata.put("providerId", template.getProviderId());
             metadata.put("description", template.getDescription());
             metadata.put("tags", template.getTags());
-            metadata.put("generatedAt", template.getGeneratedAt() != null
-                    ? template.getGeneratedAt().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME) : null);
             metadata.put("exportedAt", java.time.OffsetDateTime.now()
                     .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
 
-            String metadataJson = objectMapper.writerWithDefaultPrettyPrinter()
-                    .writeValueAsString(metadata);
-            String formStateJson = objectMapper.writerWithDefaultPrettyPrinter()
-                    .writeValueAsString(template.getFormState());
-
-            // Build zip in memory
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             try (ZipOutputStream zip = new ZipOutputStream(baos)) {
-                // form_state as the template file (raw JSON — actual rendering is done by the UI)
-                String templateFilename = sanitizeFilename(template.getName()) + "." + ext;
-                zip.putNextEntry(new ZipEntry(templateFilename));
-                zip.write(formStateJson.getBytes(StandardCharsets.UTF_8));
+                zip.putNextEntry(new ZipEntry(sanitizeFilename(template.getName()) + "." + ext));
+                zip.write(objectMapper.writerWithDefaultPrettyPrinter()
+                        .writeValueAsBytes(template.getFormState()));
                 zip.closeEntry();
 
-                // metadata
                 zip.putNextEntry(new ZipEntry("metadata.json"));
-                zip.write(metadataJson.getBytes(StandardCharsets.UTF_8));
+                zip.write(objectMapper.writerWithDefaultPrettyPrinter()
+                        .writeValueAsBytes(metadata));
                 zip.closeEntry();
             }
 
-            String zipFilename = sanitizeFilename(template.getName()) + ".zip";
             return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + zipFilename + "\"")
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"" + sanitizeFilename(template.getName()) + ".zip\"")
                     .contentType(MediaType.APPLICATION_OCTET_STREAM)
                     .body(baos.toByteArray());
 
@@ -165,66 +152,44 @@ public class TemplateController {
         }
     }
 
-    /**
-     * Import a template file.
-     * Detects provider from file extension, stores raw content as a new template.
-     * Full form pre-fill from parsed file content is a Phase 4+ enhancement.
-     */
     @PostMapping("/import")
     public ResponseEntity<Template> importTemplate(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "name", required = false) String name) {
 
-        if (file.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        if (file.isEmpty()) return ResponseEntity.badRequest().build();
 
-        String originalFilename = file.getOriginalFilename() != null
-                ? file.getOriginalFilename().toLowerCase() : "";
-
-        // Detect provider from extension
+        String originalFilename = Optional.ofNullable(file.getOriginalFilename())
+                .map(String::toLowerCase).orElse("");
         String detectedProvider = detectProvider(originalFilename);
-        if (detectedProvider == null) {
-            log.warn("[TemplateController] Import rejected — unrecognised file type: {}", originalFilename);
-            return ResponseEntity.badRequest().build();
-        }
+        if (detectedProvider == null) return ResponseEntity.badRequest().build();
 
         try {
             String rawContent = new String(file.getBytes(), StandardCharsets.UTF_8);
-            String templateName = name != null && !name.isBlank()
-                    ? name
-                    : originalFilename.isEmpty() ? "Imported template" : originalFilename;
+            String templateName = (name != null && !name.isBlank()) ? name : originalFilename;
 
-            // Store raw content in formState under a reserved key
-            // The frontend can display this as a reference alongside the form
             Map<String, Object> formState = new LinkedHashMap<>();
             formState.put("_imported", true);
             formState.put("_rawContent", rawContent);
             formState.put("_sourceFile", originalFilename);
 
+            UUID userId = CurrentUser.id().orElse(null);
             Template saved = templateService.save(null, templateName, detectedProvider,
-                    formState, "Imported from " + originalFilename, null);
-
-            log.info("[TemplateController] Imported '{}' as provider '{}' (id={})",
-                    originalFilename, detectedProvider, saved.getId());
+                    formState, "Imported from " + originalFilename, null, userId);
 
             return ResponseEntity.created(URI.create("/api/v1/templates/" + saved.getId()))
                     .body(saved);
-
         } catch (Exception e) {
             log.error("[TemplateController] Import failed: {}", e.getMessage());
             return ResponseEntity.internalServerError().build();
         }
     }
 
-    // ─── Helpers ─────────────────────────────────────────────────────────────
-
     private String detectProvider(String filename) {
         if (filename.equals("vagrantfile")) return "vagrant";
         int dot = filename.lastIndexOf('.');
         if (dot == -1) return null;
-        String ext = filename.substring(dot + 1);
-        return EXT_TO_PROVIDER.get(ext);
+        return EXT_TO_PROVIDER.get(filename.substring(dot + 1));
     }
 
     private String sanitizeFilename(String name) {

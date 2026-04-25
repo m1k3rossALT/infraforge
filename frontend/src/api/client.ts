@@ -8,21 +8,45 @@ import type {
 
 const BASE = '/api/v1'
 
+// Token provider — set by AuthContext after login
+let getAccessToken: (() => string | null) = () => null
+
+export function setTokenProvider(provider: () => string | null) {
+  getAccessToken = provider
+}
+
+function authHeaders(): HeadersInit {
+  const token = getAccessToken()
+  return token ? { 'Authorization': `Bearer ${token}` } : {}
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, options)
+  const res = await fetch(`${BASE}${path}`, {
+    ...options,
+    headers: {
+      ...authHeaders(),
+      ...(options?.headers ?? {}),
+    },
+  })
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
 }
 
 async function requestText(path: string, options?: RequestInit): Promise<string> {
-  const res = await fetch(`${BASE}${path}`, options)
+  const res = await fetch(`${BASE}${path}`, {
+    ...options,
+    headers: { ...authHeaders(), ...(options?.headers ?? {}) },
+  })
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
   return res.text()
 }
 
 async function requestBlob(path: string, options?: RequestInit): Promise<Blob> {
-  const res = await fetch(`${BASE}${path}`, options)
+  const res = await fetch(`${BASE}${path}`, {
+    ...options,
+    headers: { ...authHeaders(), ...(options?.headers ?? {}) },
+  })
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
   return res.blob()
 }
@@ -95,6 +119,11 @@ export const templateApi = {
     const form = new FormData()
     form.append('file', file)
     if (name) form.append('name', name)
-    return request('/templates/import', { method: 'POST', body: form })
+    // Don't set Content-Type — let browser set multipart boundary
+    return request('/templates/import', {
+      method: 'POST',
+      headers: { ...authHeaders() },
+      body: form,
+    })
   },
 }
