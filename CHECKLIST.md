@@ -158,9 +158,9 @@ dependency for that phase, or because the risk of not having it grows significan
 - [ ] Team workspace — shared template library within a team
 
 ### 5c — Dependency security audit
-- [ ] npm audit integrated into frontend Docker build — fail on high severity
-- [ ] mvn dependency-check:check (OWASP) added to backend build pipeline
-- [ ] Dependabot or Renovate configured on GitHub repo for automated dependency PRs
+- [x] npm audit integrated into frontend Docker build — fail on high severity
+- [x] mvn dependency-check:check (OWASP) added to backend build pipeline
+- [x] Dependabot or Renovate configured on GitHub repo for automated dependency PRs
 
 ### 5d — Kubernetes
 - [ ] Helm chart scaffolded — backend Deployment + Service, frontend Deployment + Service
