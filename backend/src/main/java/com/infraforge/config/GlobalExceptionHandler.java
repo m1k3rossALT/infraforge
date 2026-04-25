@@ -45,6 +45,15 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, "Validation failed", String.join("; ", fieldErrors), request);
     }
 
+    /** Missing template file — provider ID not found on classpath */
+    @ExceptionHandler(java.io.IOException.class)
+    public ResponseEntity<Map<String, Object>> handleIO(
+            java.io.IOException ex, HttpServletRequest request) {
+
+        log.warn("[GlobalExceptionHandler] Resource not found on {}: {}", request.getRequestURI(), ex.getMessage());
+        return build(HttpStatus.NOT_FOUND, "Not Found", "Provider or template not found.", request);
+    }
+
     /** Security: invalid provider ID (directory traversal attempt) */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalArgument(
