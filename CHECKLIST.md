@@ -103,14 +103,14 @@ dependency for that phase, or because the risk of not having it grows significan
 - [x] Frontend — load restores full form state and regenerates live preview
 - [x] Frontend — duplicate shows "Duplicated" feedback, refreshes library list
 - [x] Frontend — delete with two-step confirmation (confirm / cancel)
-- [ ] Export as zip — download template file + metadata JSON in a single archive
-- [ ] Import — upload an existing .tf / .yml / Vagrantfile and pre-fill the form
+- [x] Export as zip — download template file + metadata JSON in a single archive
+- [x] Import — upload an existing .tf / .yml / Vagrantfile and pre-fill the form
 
 ### 3e — API versioning 🔲
 - [x] Template endpoints versioned under /api/v1/
-- [ ] Provider endpoints migrated from /api/ to /api/v1/
-- [ ] nginx proxy config updated to match v1 routes
-- [ ] Versioning policy documented in README
+- [x] Provider endpoints migrated from /api/ to /api/v1/
+- [x] nginx proxy config updated to match v1 routes
+- [x] Versioning policy documented in README
 
 ---
 
