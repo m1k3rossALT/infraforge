@@ -55,91 +55,85 @@ dependency for that phase, or because the risk of not having it grows significan
 ---
 
 ## Phase 3 — Template Management & Hardening
-> Status: 🔲 Planned
+> Status: 🔲 In Progress
 
-This phase has two tracks running in parallel: the primary feature (save/load) and the
-engineering hardening that must be in place before the app handles persisted user data.
-
-### 3a — Security fixes (do these first, before any persistence work) 🔒
-
-- [ ] 🔒 Fix directory traversal — validate provider ID against registry whitelist before
+### 3a — Security fixes ✅
+- [x] 🔒 Fix directory traversal — validate provider ID against registry whitelist before
       passing to file path in TemplateRenderer
-- [ ] 🔒 Global exception handler (`@ControllerAdvice`) — strip internal stack traces from
-      API error responses, return consistent `{ error, message, timestamp }` JSON
-- [ ] 🔒 Request body size limit — set `spring.servlet.multipart.max-request-size` and
-      `server.tomcat.max-http-form-post-size` in application.yml
-- [ ] 🔒 Input validation — add `@Valid` + `@Size` / `@NotBlank` constraints on
+- [x] 🔒 Global exception handler (@ControllerAdvice) — strip internal stack traces from
+      API error responses, return consistent { error, message, timestamp } JSON
+- [x] 🔒 Request body size limit — set spring.servlet.multipart.max-request-size and
+      server.tomcat.max-http-form-post-size in application.yml
+- [x] 🔒 Input validation — add @Valid + @Size / @NotBlank constraints on
       GenerateRequest fields, return 400 with field-level errors
-- [ ] 🔒 Lock CORS to explicit allowed origins (not wildcard localhost:*) in WebConfig
+- [x] 🔒 Lock CORS to explicit allowed origins via environment variable (INFRAFORGE_CORS_ORIGINS)
 
-### 3b — Observability
+### 3b — Observability ✅
+- [x] Logback config (logback-spring.xml) — rolling file appender, 30-day retention,
+      separate error log file, async writers
+- [x] Spring Boot Actuator — health and info endpoints exposed, all others locked down
+- [x] Correlation/request ID — MDC filter (RequestIdFilter) generates UUID per request,
+      included in every log line, echoed in X-Request-ID response header
+- [x] Environment profiles — application-dev.yml and application-prod.yml created,
+      environment-specific values separated from base config
+- [x] Graceful shutdown — server.shutdown=graceful and lifecycle timeout configured
 
-- [ ] Logback config (`logback-spring.xml`) — structured JSON logging, rolling file appender,
-      30-day retention, separate error log file
-- [ ] Spring Boot Actuator — add dependency, expose `/actuator/health` and `/actuator/info`,
-      lock down all other actuator endpoints
-- [ ] Correlation/request ID — MDC filter that generates a UUID per request and includes it
-      in every log line for that request
-- [ ] Environment profiles — create `application-dev.yml` and `application-prod.yml`,
-      move environment-specific values out of the base config
-- [ ] Graceful shutdown — set `server.shutdown=graceful` and
-      `spring.lifecycle.timeout-per-shutdown-phase=20s` in application.yml
+### 3c — Database ✅
+- [x] PostgreSQL 16 for both dev and prod (chosen over H2 for consistency)
+- [x] PostgreSQL container added to docker-compose.yml with health check and named volume
+- [x] Configure datasource in application-dev.yml and application-prod.yml
+- [x] Flyway migration setup — V1__baseline_schema.sql with templates table, indexes,
+      JSONB form_state column, auto-updated updated_at trigger
+- [x] Template JPA entity with UUID primary key, JSONB form_state, tags array
+- [x] TemplateRepository with provider-filtered and date-sorted queries
+- [x] TemplateService — save, update, find all, find by id, delete, duplicate
 
-### 3c — Database
-
-- [ ] Add H2 (dev) and PostgreSQL (prod) dependencies to pom.xml
-- [ ] Configure datasource in application-dev.yml and application-prod.yml
-- [ ] Flyway migration setup — baseline schema for template storage
-- [ ] Template entity and JPA repository
-- [ ] TemplateService — save, find all, find by id, delete, duplicate
-
-### 3d — Template management features
-
-- [ ] `POST /api/templates` — save a generated template with a name and provider ID
-- [ ] `GET /api/templates` — list all saved templates (id, name, provider, created date)
-- [ ] `GET /api/templates/{id}` — load a saved template (returns form state)
-- [ ] `DELETE /api/templates/{id}` — delete a saved template
-- [ ] `POST /api/templates/{id}/duplicate` — clone a template with a new name
-- [ ] Frontend — template library panel (list, open, duplicate, delete)
-- [ ] Frontend — save dialog (name input, provider shown, confirm)
-- [ ] Frontend — load restores form state and regenerates live preview
-- [ ] Export as zip — download template file + a metadata JSON in a single archive
+### 3d — Template management features 🔲
+- [x] POST /api/v1/templates — create a new saved template
+- [x] PUT /api/v1/templates/{id} — update existing template (used by auto-save)
+- [x] GET /api/v1/templates — list all templates (summary only, no formState)
+- [x] GET /api/v1/templates/{id} — load a single template with full form state
+- [x] DELETE /api/v1/templates/{id} — delete a template with confirmation UI
+- [x] POST /api/v1/templates/{id}/duplicate — clone with "Copy of <name>"
+- [x] Frontend — sliding left drawer (TemplateDrawer) with template library
+- [x] Frontend — document title field in top bar, triggers save when named
+- [x] Frontend — manual Save button + "Saved" feedback
+- [x] Frontend — auto-save after 30s inactivity when template is named (useAutoSave hook)
+- [x] Frontend — "Unsaved changes" / "Saved" status indicator in top bar
+- [x] Frontend — load restores full form state and regenerates live preview
+- [x] Frontend — duplicate shows "Duplicated" feedback, refreshes library list
+- [x] Frontend — delete with two-step confirmation (confirm / cancel)
+- [ ] Export as zip — download template file + metadata JSON in a single archive
 - [ ] Import — upload an existing .tf / .yml / Vagrantfile and pre-fill the form
 
-### 3e — API versioning (do before adding template endpoints)
-
-- [ ] Rename all routes from `/api/*` to `/api/v1/*`
-- [ ] Update nginx proxy config to match
-- [ ] Update frontend API client base path
-- [ ] Document versioning policy in README
+### 3e — API versioning 🔲
+- [x] Template endpoints versioned under /api/v1/
+- [ ] Provider endpoints migrated from /api/ to /api/v1/
+- [ ] nginx proxy config updated to match v1 routes
+- [ ] Versioning policy documented in README
 
 ---
 
 ## Phase 4 — AI-Assisted Field Suggestions
 > Status: 🔲 Future
 
-Hook points were designed into the architecture in Phase 1. This phase activates them.
-
 ### 4a — Infrastructure
-
 - [ ] Choose LLM provider (OpenAI, Anthropic, local Ollama) and add client dependency
 - [ ] Add API key config to application-prod.yml (never hardcoded)
-- [ ] Implement `EnhancementService` interface — no-op in dev profile, real impl in prod
-- [ ] Add `POST /api/v1/providers/{id}/suggest` — accepts partial form state,
+- [ ] Implement EnhancementService interface — no-op in dev profile, real impl in prod
+- [ ] Add POST /api/v1/providers/{id}/suggest — accepts partial form state,
       returns AI-suggested field values
 - [ ] Rate limiting on suggest endpoint — Bucket4j, per-session limit
 
 ### 4b — Frontend
-
 - [ ] "Suggest" button per section — calls suggest endpoint with current form state
 - [ ] Suggestion diff view — show suggested values highlighted before applying
 - [ ] Accept / reject per field
 - [ ] Loading state and graceful degradation when AI is unavailable
 
 ### 4c — Schema integration
-
-- [ ] `aiHint` field in schema.json activated — included in prompt context
-- [ ] Natural language input field — "describe what you want to build" → pre-fills form
+- [ ] aiHint field in schema.json activated — included in prompt context
+- [ ] Natural language input field — "describe what you want to build" pre-fills form
 
 ---
 
@@ -147,46 +141,40 @@ Hook points were designed into the architecture in Phase 1. This phase activates
 > Status: 🔲 Future
 
 ### 5a — Authentication & authorisation 🔒
-
 - [ ] 🔒 Spring Security dependency added
 - [ ] 🔒 JWT-based authentication — login endpoint, token issue and validation
 - [ ] 🔒 Refresh token flow
 - [ ] 🔒 RBAC — roles: viewer, editor, admin
-- [ ] 🔒 Endpoint protection — all `/api/v1/*` routes require valid token
+- [ ] 🔒 Endpoint protection — all /api/v1/* routes require valid token
 - [ ] 🔒 CSRF protection enabled
 - [ ] 🔒 Password hashing — BCrypt for stored credentials
-- [ ] 🔒 HTTPS enforced — HTTP → HTTPS redirect in nginx
+- [ ] 🔒 HTTPS enforced — HTTP to HTTPS redirect in nginx
 - [ ] 🔒 Security headers — HSTS, X-Frame-Options, Content-Security-Policy in nginx config
 
 ### 5b — Multi-user features
-
 - [ ] User registration and login UI
 - [ ] Templates scoped to user — users only see their own templates
 - [ ] Template sharing — share a template read-only via a link
 - [ ] Team workspace — shared template library within a team
 
 ### 5c — Dependency security audit
-
-- [ ] `npm audit` integrated into frontend Docker build — fail on high severity
-- [ ] `mvn dependency-check:check` (OWASP) added to backend build pipeline
+- [ ] npm audit integrated into frontend Docker build — fail on high severity
+- [ ] mvn dependency-check:check (OWASP) added to backend build pipeline
 - [ ] Dependabot or Renovate configured on GitHub repo for automated dependency PRs
 
 ### 5d — Kubernetes
-
 - [ ] Helm chart scaffolded — backend Deployment + Service, frontend Deployment + Service
 - [ ] ConfigMap for application.yml values
 - [ ] Secret for database credentials and API keys
 - [ ] Horizontal Pod Autoscaler for backend
 - [ ] Ingress controller config (nginx ingress)
-- [ ] Liveness and readiness probes wired to `/actuator/health`
+- [ ] Liveness and readiness probes wired to /actuator/health
 - [ ] PersistentVolumeClaim for PostgreSQL
 - [ ] Resource requests and limits defined on all containers
 
 ---
 
 ## Ongoing — applies to every phase
-
-These are not phase-specific. They apply from now on every time a feature branch is merged.
 
 - [ ] No secrets or credentials committed to Git (enforce with pre-commit hook or GitHub secret scanning)
 - [ ] Docker build passes cleanly before merging any branch
@@ -201,6 +189,6 @@ These are not phase-specific. They apply from now on every time a feature branch
 
 | Phase | Merge to main when... |
 |---|---|
-| 3 | Security fixes 3a done, template save/load working end-to-end, logs writing to file |
+| 3 | All 3d and 3e items complete, export/import working, provider routes on v1 |
 | 4 | Suggest endpoint live, frontend diff view working, graceful degradation tested |
 | 5 | Auth flow complete, all endpoints protected, Helm chart deploys cleanly to local k8s |
