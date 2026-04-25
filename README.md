@@ -209,7 +209,7 @@ const projectName = "${proj.project_name}";
 |---|---|---|
 | 1 | ✅ Complete | Terraform AWS builder, live preview, Docker |
 | 2 | ✅ Complete | Ansible (17 sections), Vagrant (19 sections), full provider coverage |
-| 3 | 🔲 In Progress | Security hardening, observability, PostgreSQL, template management |
+| 3 | ✅ Complete | Security hardening, observability, PostgreSQL, template management |
 | 4 | Future | AI-assisted field suggestions (hook points already in place) |
 | 5 | Future | Kubernetes deployment, multi-user support, template sharing |
 
