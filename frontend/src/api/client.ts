@@ -1,11 +1,16 @@
-import type { FormState, ProviderSchema, ProviderSummary, SavedTemplate, TemplateSummary } from '../types/schema'
+import type {
+  FormState,
+  ProviderSchema,
+  ProviderSummary,
+  SavedTemplate,
+  TemplateSummary,
+} from '../types/schema'
 
-const BASE = '/api'
+const BASE = '/api/v1'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, options)
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
-  // Handle 204 No Content (delete)
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
 }
@@ -14,6 +19,12 @@ async function requestText(path: string, options?: RequestInit): Promise<string>
   const res = await fetch(`${BASE}${path}`, options)
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
   return res.text()
+}
+
+async function requestBlob(path: string, options?: RequestInit): Promise<Blob> {
+  const res = await fetch(`${BASE}${path}`, options)
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+  return res.blob()
 }
 
 // ─── Provider API ─────────────────────────────────────────────────────────────
@@ -33,7 +44,7 @@ export const api = {
     }),
 }
 
-// ─── Template API (v1) ────────────────────────────────────────────────────────
+// ─── Template API ─────────────────────────────────────────────────────────────
 
 type SavePayload = {
   name: string
@@ -45,28 +56,45 @@ type SavePayload = {
 
 export const templateApi = {
   list: (providerId?: string): Promise<TemplateSummary[]> =>
-    request(`/v1/templates${providerId ? `?providerId=${encodeURIComponent(providerId)}` : ''}`),
+    request(`/templates${providerId ? `?providerId=${encodeURIComponent(providerId)}` : ''}`),
 
   getById: (id: string): Promise<SavedTemplate> =>
-    request(`/v1/templates/${id}`),
+    request(`/templates/${id}`),
 
   create: (payload: SavePayload): Promise<SavedTemplate> =>
-    request('/v1/templates', {
+    request('/templates', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }),
 
   update: (id: string, payload: SavePayload): Promise<SavedTemplate> =>
-    request(`/v1/templates/${id}`, {
+    request(`/templates/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }),
 
   delete: (id: string): Promise<void> =>
-    request(`/v1/templates/${id}`, { method: 'DELETE' }),
+    request(`/templates/${id}`, { method: 'DELETE' }),
 
   duplicate: (id: string): Promise<SavedTemplate> =>
-    request(`/v1/templates/${id}/duplicate`, { method: 'POST' }),
+    request(`/templates/${id}/duplicate`, { method: 'POST' }),
+
+  export: async (id: string, name: string): Promise<void> => {
+    const blob = await requestBlob(`/templates/${id}/export`)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${name.replace(/[^a-zA-Z0-9._-]/g, '_')}.zip`
+    a.click()
+    URL.revokeObjectURL(url)
+  },
+
+  import: (file: File, name?: string): Promise<SavedTemplate> => {
+    const form = new FormData()
+    form.append('file', file)
+    if (name) form.append('name', name)
+    return request('/templates/import', { method: 'POST', body: form })
+  },
 }
