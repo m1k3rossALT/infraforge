@@ -3,6 +3,12 @@ FROM node:20-alpine AS build
 WORKDIR /app
 COPY package.json .
 RUN npm install
+
+# Fail the build if any high or critical vulnerabilities are found.
+# Use --audit-level=high to ignore low/moderate findings (common in transitive deps).
+# To bypass temporarily: comment out this line and document why in your commit message.
+RUN npm audit --audit-level=high
+
 COPY . .
 RUN npm run build
 
