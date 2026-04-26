@@ -26,7 +26,8 @@ import java.util.Map;
  *   - Stateless session (JWT) — no server-side session state
  *   - CSRF disabled — not needed for stateless JWT APIs
  *   - Anonymous access to provider and generate endpoints — supports guest mode
- *   - All template endpoints require authentication — saving requires login
+ *   - Shared template endpoint is fully public — access gated by unguessable UUID token
+ *   - All template management endpoints require authentication
  *   - Auth endpoints (register/login/refresh) are public
  *
  * To add OAuth2 in the future: add .oauth2ResourceServer() config here
@@ -54,6 +55,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 // Public — provider endpoints (guest mode: anyone can generate templates)
                 .requestMatchers("/api/v1/providers/**").permitAll()
+                // Public — shared template views (access controlled by unguessable UUID token)
+                .requestMatchers("/api/v1/shared/**").permitAll()
                 // Public — health check
                 .requestMatchers("/api/v1/health", "/actuator/health", "/actuator/info").permitAll()
                 // Protected — template management requires login

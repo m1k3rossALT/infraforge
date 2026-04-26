@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { templateApi } from '../api/client'
+import { shareApi, templateApi } from '../api/client'
 import type { SavedTemplate, TemplateSummary } from '../types/schema'
 
 interface Props {
@@ -70,6 +70,38 @@ export function TemplateDrawer({ open, onClose, onLoad, onImport }: Props) {
       showFeedback(id, 'Exported')
     } catch (e) {
       console.error('Failed to export template', e)
+    }
+  }
+
+  const handleShare = async (id: string) => {
+    try {
+      const { shareUrl } = await shareApi.share(id)
+      await navigator.clipboard.writeText(shareUrl)
+      // Update local state so button flips to Unshare immediately
+      setTemplates(prev => prev.map(t =>
+        t.id === id ? { ...t, shareToken: shareUrl.split('/shared/')[1] } : t
+      ))
+      showFeedback(id, 'Link copied')
+    } catch (e) {
+      console.error('Failed to share template', e)
+    }
+  }
+
+  const handleCopyShareLink = async (shareToken: string, id: string) => {
+    const url = `${window.location.origin}/shared/${shareToken}`
+    await navigator.clipboard.writeText(url)
+    showFeedback(id, 'Link copied')
+  }
+
+  const handleUnshare = async (id: string) => {
+    try {
+      await shareApi.unshare(id)
+      setTemplates(prev => prev.map(t =>
+        t.id === id ? { ...t, shareToken: undefined } : t
+      ))
+      showFeedback(id, 'Unshared')
+    } catch (e) {
+      console.error('Failed to unshare template', e)
     }
   }
 
@@ -160,11 +192,16 @@ export function TemplateDrawer({ open, onClose, onLoad, onImport }: Props) {
 
           {templates.map(t => (
             <div key={t.id} style={{ padding: '10px 16px', borderBottom: '1px solid var(--color-border)' }}>
-              {/* Name + provider badge */}
+              {/* Name + provider badge + shared indicator */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                 <span style={{ fontSize: '13px', fontWeight: '500', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {t.name}
                 </span>
+                {t.shareToken && (
+                  <span style={{ fontSize: '10px', color: 'var(--color-live)', border: '1px solid var(--color-live)', borderRadius: '3px', padding: '1px 5px', flexShrink: 0 }}>
+                    Shared
+                  </span>
+                )}
                 <span style={{
                   fontSize: '10px', color: 'var(--color-text-muted)',
                   border: '1px solid var(--color-border)', borderRadius: '3px', padding: '1px 5px', flexShrink: 0,
@@ -178,7 +215,7 @@ export function TemplateDrawer({ open, onClose, onLoad, onImport }: Props) {
                 {formatDate(t.updatedAt)}
               </p>
 
-              {/* Actions */}
+              {/* Actions — row 1: Open, Duplicate, Export, Delete */}
               {deleteConfirmId === t.id ? (
                 <div style={{ display: 'flex', gap: '6px' }}>
                   <button onClick={() => handleDelete(t.id)} style={{ flex: 1, padding: '4px 0', fontSize: '11px', color: '#b91c1c', background: '#fff5f5', border: '1px solid #fecaca', borderRadius: '4px', cursor: 'pointer' }}>
@@ -189,26 +226,55 @@ export function TemplateDrawer({ open, onClose, onLoad, onImport }: Props) {
                   </button>
                 </div>
               ) : (
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <button onClick={() => handleLoad(t.id)} style={{ flex: 1, padding: '4px 0', fontSize: '11px', color: 'var(--color-text-primary)', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}>
-                    Open
-                  </button>
-                  <button
-                    onClick={() => handleDuplicate(t.id)}
-                    style={{ flex: 1, padding: '4px 0', fontSize: '11px', color: feedback?.id === t.id && feedback.msg === 'Duplicated' ? 'var(--color-live)' : 'var(--color-text-secondary)', background: 'none', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}
-                  >
-                    {feedback?.id === t.id && feedback.msg === 'Duplicated' ? 'Duplicated' : 'Duplicate'}
-                  </button>
-                  <button
-                    onClick={() => handleExport(t.id, t.name)}
-                    style={{ flex: 1, padding: '4px 0', fontSize: '11px', color: feedback?.id === t.id && feedback.msg === 'Exported' ? 'var(--color-live)' : 'var(--color-text-secondary)', background: 'none', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}
-                  >
-                    {feedback?.id === t.id && feedback.msg === 'Exported' ? 'Exported ↓' : 'Export'}
-                  </button>
-                  <button onClick={() => setDeleteConfirmId(t.id)} style={{ padding: '4px 8px', fontSize: '11px', color: 'var(--color-text-muted)', background: 'none', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}>
-                    ✕
-                  </button>
-                </div>
+                <>
+                  <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
+                    <button onClick={() => handleLoad(t.id)} style={{ flex: 1, padding: '4px 0', fontSize: '11px', color: 'var(--color-text-primary)', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}>
+                      Open
+                    </button>
+                    <button
+                      onClick={() => handleDuplicate(t.id)}
+                      style={{ flex: 1, padding: '4px 0', fontSize: '11px', color: feedback?.id === t.id && feedback.msg === 'Duplicated' ? 'var(--color-live)' : 'var(--color-text-secondary)', background: 'none', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}
+                    >
+                      {feedback?.id === t.id && feedback.msg === 'Duplicated' ? 'Duplicated' : 'Duplicate'}
+                    </button>
+                    <button
+                      onClick={() => handleExport(t.id, t.name)}
+                      style={{ flex: 1, padding: '4px 0', fontSize: '11px', color: feedback?.id === t.id && feedback.msg === 'Exported' ? 'var(--color-live)' : 'var(--color-text-secondary)', background: 'none', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}
+                    >
+                      {feedback?.id === t.id && feedback.msg === 'Exported' ? 'Exported ↓' : 'Export'}
+                    </button>
+                    <button onClick={() => setDeleteConfirmId(t.id)} style={{ padding: '4px 8px', fontSize: '11px', color: 'var(--color-text-muted)', background: 'none', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}>
+                      ✕
+                    </button>
+                  </div>
+
+                  {/* Actions — row 2: Share controls */}
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {t.shareToken ? (
+                      <>
+                        <button
+                          onClick={() => handleCopyShareLink(t.shareToken!, t.id)}
+                          style={{ flex: 2, padding: '4px 0', fontSize: '11px', color: feedback?.id === t.id && feedback.msg === 'Link copied' ? 'var(--color-live)' : 'var(--color-text-secondary)', background: 'none', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}
+                        >
+                          {feedback?.id === t.id && feedback.msg === 'Link copied' ? '✓ Copied' : '⎘ Copy link'}
+                        </button>
+                        <button
+                          onClick={() => handleUnshare(t.id)}
+                          style={{ flex: 1, padding: '4px 0', fontSize: '11px', color: 'var(--color-text-muted)', background: 'none', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}
+                        >
+                          Unshare
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => handleShare(t.id)}
+                        style={{ flex: 1, padding: '4px 0', fontSize: '11px', color: 'var(--color-text-secondary)', background: 'none', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}
+                      >
+                        Share
+                      </button>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           ))}
