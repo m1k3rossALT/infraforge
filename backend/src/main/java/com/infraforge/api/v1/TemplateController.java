@@ -7,6 +7,7 @@ import com.infraforge.model.Template;
 import com.infraforge.model.TemplateSummary;
 import com.infraforge.security.CurrentUser;
 import com.infraforge.service.TemplateService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,9 +68,7 @@ public class TemplateController {
         Template template = opt.get();
         UUID userId = CurrentUser.id().orElse(null);
 
-        // Enforce ownership: if the template has an owner and the caller is not that owner, deny.
-        // Templates with userId=null (created before auth existed) remain accessible — backward compat.
-        // Note: Phase 5b share links use a separate /api/v1/shared/{shareToken} route, not this one.
+        // Enforce ownership — templates with null userId are accessible (pre-auth backward compat)
         if (template.getUserId() != null && !template.getUserId().equals(userId)) {
             return ResponseEntity.status(403).build();
         }
@@ -118,14 +117,55 @@ public class TemplateController {
         }
     }
 
+    // ─── Share endpoints ─────────────────────────────────────────────────────
+
+    /**
+     * Generate a public share token for this template.
+     * Idempotent — calling again returns the same token.
+     * Returns the token and the full share URL so the frontend can copy it directly.
+     */
+    @PostMapping("/{id}/share")
+    public ResponseEntity<?> share(@PathVariable UUID id, HttpServletRequest request) {
+        UUID userId = CurrentUser.id().orElse(null);
+        try {
+            UUID token = templateService.generateShareToken(id, userId);
+            String shareUrl = buildShareUrl(request, token);
+            return ResponseEntity.ok(Map.of(
+                    "shareToken", token.toString(),
+                    "shareUrl", shareUrl
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (SecurityException e) {
+            return ResponseEntity.status(403).build();
+        }
+    }
+
+    /**
+     * Revoke the share token for this template.
+     * After this the public shared URL returns 404.
+     */
+    @DeleteMapping("/{id}/share")
+    public ResponseEntity<Void> unshare(@PathVariable UUID id) {
+        UUID userId = CurrentUser.id().orElse(null);
+        try {
+            templateService.revokeShareToken(id, userId);
+            return ResponseEntity.noContent().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (SecurityException e) {
+            return ResponseEntity.status(403).build();
+        }
+    }
+
+    // ─── Export / Import ─────────────────────────────────────────────────────
+
     @GetMapping("/{id}/export")
     public ResponseEntity<byte[]> export(@PathVariable UUID id) {
         Optional<Template> opt = templateService.findById(id);
         if (opt.isEmpty()) return ResponseEntity.notFound().build();
 
         Template template = opt.get();
-
-        // Ownership check — same rule as getById
         UUID userId = CurrentUser.id().orElse(null);
         if (template.getUserId() != null && !template.getUserId().equals(userId)) {
             return ResponseEntity.status(403).build();
@@ -201,6 +241,22 @@ public class TemplateController {
             log.error("[TemplateController] Import failed: {}", e.getMessage());
             return ResponseEntity.internalServerError().build();
         }
+    }
+
+    // ─── Helpers ─────────────────────────────────────────────────────────────
+
+    /**
+     * Build the full share URL from the incoming request context.
+     * Uses X-Forwarded-Proto/Host headers so it works correctly behind nginx.
+     */
+    private String buildShareUrl(HttpServletRequest request, UUID token) {
+        String proto = Optional.ofNullable(request.getHeader("X-Forwarded-Proto"))
+                .orElse(request.getScheme());
+        String host = Optional.ofNullable(request.getHeader("X-Forwarded-Host"))
+                .orElse(request.getServerName() +
+                        (request.getServerPort() == 80 || request.getServerPort() == 443
+                                ? "" : ":" + request.getServerPort()));
+        return proto + "://" + host + "/shared/" + token;
     }
 
     private String detectProvider(String filename) {

@@ -55,6 +55,7 @@ export interface TemplateSummary {
   description?: string
   tags?: string[]
   updatedAt: string
+  shareToken?: string  // null/undefined = private; present = shared
 }
 
 export interface SavedTemplate {
@@ -66,4 +67,17 @@ export interface SavedTemplate {
   tags?: string[]
   updatedAt: string
   generatedAt: string
+  shareToken?: string
+}
+
+// ─── Shared view type ────────────────────────────────────────────────────────
+
+/**
+ * Response from GET /api/v1/shared/{token}.
+ * Contains only what is safe to expose publicly — no formState, no userId.
+ */
+export interface SharedTemplate {
+  name: string
+  providerId: string
+  generatedCode: string
 }

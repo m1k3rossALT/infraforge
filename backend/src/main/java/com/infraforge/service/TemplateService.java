@@ -2,7 +2,6 @@ package com.infraforge.service;
 
 import com.infraforge.model.Template;
 import com.infraforge.model.TemplateRepository;
-import com.infraforge.model.User;
 import com.infraforge.model.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,7 +15,7 @@ import java.util.UUID;
 
 /**
  * Business logic for saved templates.
- * All mutating operations now accept an optional userId for ownership scoping.
+ * All mutating operations accept an optional userId for ownership scoping.
  * Null userId = guest/unowned (backward compatible with Phase 3 templates).
  */
 @Service
@@ -55,6 +54,12 @@ public class TemplateService {
         return repository.findById(id);
     }
 
+    /** Find a template by its public share token — used by the public shared view endpoint */
+    @Transactional(readOnly = true)
+    public Optional<Template> findByShareToken(UUID shareToken) {
+        return repository.findByShareToken(shareToken);
+    }
+
     public Template save(UUID id, String name, String providerId,
                          Map<String, Object> formState, String description,
                          List<String> tags, UUID userId) {
@@ -84,7 +89,6 @@ public class TemplateService {
         Optional<Template> opt = repository.findById(id);
         if (opt.isEmpty()) return false;
 
-        // Only owner can delete their template
         Template template = opt.get();
         if (userId != null && template.getUserId() != null
                 && !template.getUserId().equals(userId)) {
@@ -106,11 +110,60 @@ public class TemplateService {
         copy.setFormState(original.getFormState());
         copy.setDescription(original.getDescription());
         copy.setTags(original.getTags());
-        copy.setUserId(userId); // Copy belongs to the requesting user
+        copy.setUserId(userId);
+        // share_token intentionally not copied — the duplicate is private by default
 
         Template saved = repository.save(copy);
         log.info("[TemplateService] Duplicated '{}' -> '{}' (id={})",
                 original.getName(), saved.getName(), saved.getId());
         return saved;
+    }
+
+    /**
+     * Generate a share token for the given template.
+     * Idempotent — if the template already has a token, the existing one is returned.
+     * Only the owner can share their template.
+     *
+     * @throws SecurityException    if caller does not own the template
+     * @throws IllegalArgumentException if template is not found
+     */
+    public UUID generateShareToken(UUID templateId, UUID userId) {
+        Template template = repository.findById(templateId)
+                .orElseThrow(() -> new IllegalArgumentException("Template not found: " + templateId));
+
+        if (template.getUserId() != null && !template.getUserId().equals(userId)) {
+            throw new SecurityException("Not authorised to share this template");
+        }
+
+        if (template.getShareToken() != null) {
+            return template.getShareToken(); // already shared — return existing token
+        }
+
+        UUID token = UUID.randomUUID();
+        template.setShareToken(token);
+        repository.save(template);
+        log.info("[TemplateService] Share token generated for template id={}", templateId);
+        return token;
+    }
+
+    /**
+     * Revoke the share token for the given template.
+     * After this call, the public shared URL returns 404.
+     * Only the owner can revoke.
+     *
+     * @throws SecurityException    if caller does not own the template
+     * @throws IllegalArgumentException if template is not found
+     */
+    public void revokeShareToken(UUID templateId, UUID userId) {
+        Template template = repository.findById(templateId)
+                .orElseThrow(() -> new IllegalArgumentException("Template not found: " + templateId));
+
+        if (template.getUserId() != null && !template.getUserId().equals(userId)) {
+            throw new SecurityException("Not authorised to revoke sharing for this template");
+        }
+
+        template.setShareToken(null);
+        repository.save(template);
+        log.info("[TemplateService] Share token revoked for template id={}", templateId);
     }
 }

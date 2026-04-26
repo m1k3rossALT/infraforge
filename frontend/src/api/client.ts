@@ -3,6 +3,7 @@ import type {
   ProviderSchema,
   ProviderSummary,
   SavedTemplate,
+  SharedTemplate,
   TemplateSummary,
 } from '../types/schema'
 
@@ -151,11 +152,37 @@ export const templateApi = {
     const form = new FormData()
     form.append('file', file)
     if (name) form.append('name', name)
-    // Don't set Content-Type — let browser set multipart boundary
     return request('/templates/import', {
       method: 'POST',
       headers: { ...authHeaders() },
       body: form,
     })
+  },
+}
+
+// ─── Share API ────────────────────────────────────────────────────────────────
+
+export const shareApi = {
+  /**
+   * Generate a share token for a template. Idempotent.
+   * Returns { shareToken, shareUrl } from the backend.
+   */
+  share: (id: string): Promise<{ shareToken: string; shareUrl: string }> =>
+    request(`/templates/${id}/share`, { method: 'POST' }),
+
+  /**
+   * Revoke the share token. After this the share URL returns 404.
+   */
+  unshare: (id: string): Promise<void> =>
+    request(`/templates/${id}/share`, { method: 'DELETE' }),
+
+  /**
+   * Fetch a shared template by token. No auth required.
+   * Used by SharedView — called without the Authorization header.
+   */
+  getShared: async (token: string): Promise<SharedTemplate> => {
+    const res = await fetch(`${BASE}/shared/${token}`)
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+    return res.json()
   },
 }
