@@ -8,21 +8,77 @@ import type {
 
 const BASE = '/api/v1'
 
+// ─── Token providers — set by AuthContext after login ─────────────────────────
+
+let getAccessToken: () => string | null = () => null
+let doRefresh: (() => Promise<string | null>) | null = null
+
+export function setTokenProvider(provider: () => string | null) {
+  getAccessToken = provider
+}
+
+/**
+ * Set the refresh function from AuthContext.
+ * When a request returns 401, the client will call this once to get a new
+ * access token and retry the original request transparently.
+ * If refresh fails (token expired/revoked), AuthContext clears auth state
+ * and the retry 401 is surfaced as a normal error.
+ */
+export function setRefreshProvider(provider: () => Promise<string | null>) {
+  doRefresh = provider
+}
+
+function authHeaders(token?: string | null): HeadersInit {
+  const t = token ?? getAccessToken()
+  return t ? { 'Authorization': `Bearer ${t}` } : {}
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, options)
+  const res = await fetch(`${BASE}${path}`, {
+    ...options,
+    headers: {
+      ...authHeaders(),
+      ...(options?.headers ?? {}),
+    },
+  })
+
+  // Silent refresh on 401 — attempt once, then retry the original request
+  if (res.status === 401 && doRefresh) {
+    const newToken = await doRefresh()
+    if (newToken) {
+      const retryRes = await fetch(`${BASE}${path}`, {
+        ...options,
+        headers: {
+          ...authHeaders(newToken),
+          ...(options?.headers ?? {}),
+        },
+      })
+      if (!retryRes.ok) throw new Error(`${retryRes.status} ${retryRes.statusText}`)
+      if (retryRes.status === 204) return undefined as T
+      return retryRes.json() as Promise<T>
+    }
+    // Refresh failed — AuthContext already cleared auth state; surface the error
+  }
+
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
 }
 
 async function requestText(path: string, options?: RequestInit): Promise<string> {
-  const res = await fetch(`${BASE}${path}`, options)
+  const res = await fetch(`${BASE}${path}`, {
+    ...options,
+    headers: { ...authHeaders(), ...(options?.headers ?? {}) },
+  })
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
   return res.text()
 }
 
 async function requestBlob(path: string, options?: RequestInit): Promise<Blob> {
-  const res = await fetch(`${BASE}${path}`, options)
+  const res = await fetch(`${BASE}${path}`, {
+    ...options,
+    headers: { ...authHeaders(), ...(options?.headers ?? {}) },
+  })
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
   return res.blob()
 }
@@ -95,6 +151,11 @@ export const templateApi = {
     const form = new FormData()
     form.append('file', file)
     if (name) form.append('name', name)
-    return request('/templates/import', { method: 'POST', body: form })
+    // Don't set Content-Type — let browser set multipart boundary
+    return request('/templates/import', {
+      method: 'POST',
+      headers: { ...authHeaders() },
+      body: form,
+    })
   },
 }

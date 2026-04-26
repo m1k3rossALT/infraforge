@@ -27,6 +27,11 @@ spring:
 infraforge:
   cors:
     allowed-origins: ${INFRAFORGE_CORS_ORIGINS:http://localhost:3000,http://localhost:5173}
+  jwt:
+    # Must be at least 32 characters. Override via INFRAFORGE_JWT_SECRET in production.
+    secret: ${INFRAFORGE_JWT_SECRET:dev-secret-change-this-in-production-must-be-32-chars}
+    access-token-expiry-ms: ${INFRAFORGE_JWT_ACCESS_EXPIRY_MS:900000}   # 15 minutes
+    refresh-token-expiry-days: ${INFRAFORGE_JWT_REFRESH_EXPIRY_DAYS:7}
 
 # Actuator base config — profile configs extend this
 management:

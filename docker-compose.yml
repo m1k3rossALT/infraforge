@@ -33,6 +33,8 @@ services:
       - DB_URL=jdbc:postgresql://db:5432/infraforge
       - DB_USERNAME=infraforge
       - DB_PASSWORD=infraforge
+      # Change this in production — must be at least 32 characters
+      - INFRAFORGE_JWT_SECRET=dev-secret-change-this-in-production-must-be-32-chars
     volumes:
       - ./logs:/app/logs
     depends_on:

@@ -2,6 +2,8 @@ package com.infraforge.service;
 
 import com.infraforge.model.Template;
 import com.infraforge.model.TemplateRepository;
+import com.infraforge.model.User;
+import com.infraforge.model.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -13,9 +15,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Business logic layer for saved templates.
- * Controllers call this — never the repository directly.
- * Future enhancements (e.g. user scoping, search, versioning) go here.
+ * Business logic for saved templates.
+ * All mutating operations now accept an optional userId for ownership scoping.
+ * Null userId = guest/unowned (backward compatible with Phase 3 templates).
  */
 @Service
 @Transactional
@@ -24,32 +26,38 @@ public class TemplateService {
     private static final Logger log = LoggerFactory.getLogger(TemplateService.class);
 
     private final TemplateRepository repository;
+    private final UserRepository userRepository;
 
-    public TemplateService(TemplateRepository repository) {
+    public TemplateService(TemplateRepository repository, UserRepository userRepository) {
         this.repository = repository;
+        this.userRepository = userRepository;
     }
 
-    /** List all templates, newest first */
+    /** List templates — if userId provided, returns only that user's templates */
     @Transactional(readOnly = true)
-    public List<Template> listAll() {
+    public List<Template> listAll(UUID userId) {
+        if (userId != null) {
+            return repository.findByUserIdOrderByUpdatedAtDesc(userId);
+        }
         return repository.findAllByOrderByUpdatedAtDesc();
     }
 
-    /** List templates for a specific provider, newest first */
     @Transactional(readOnly = true)
-    public List<Template> listByProvider(String providerId) {
+    public List<Template> listByProvider(String providerId, UUID userId) {
+        if (userId != null) {
+            return repository.findByProviderIdAndUserIdOrderByUpdatedAtDesc(providerId, userId);
+        }
         return repository.findByProviderIdOrderByUpdatedAtDesc(providerId);
     }
 
-    /** Find a single template by ID */
     @Transactional(readOnly = true)
     public Optional<Template> findById(UUID id) {
         return repository.findById(id);
     }
 
-    /** Save a new template or update an existing one by ID */
     public Template save(UUID id, String name, String providerId,
-                         Map<String, Object> formState, String description, List<String> tags) {
+                         Map<String, Object> formState, String description,
+                         List<String> tags, UUID userId) {
 
         Template template = id != null
                 ? repository.findById(id).orElse(new Template())
@@ -61,24 +69,34 @@ public class TemplateService {
         template.setDescription(description);
         template.setTags(tags);
 
+        // Set owner if provided and not already set
+        if (userId != null && template.getUserId() == null) {
+            template.setUserId(userId);
+        }
+
         Template saved = repository.save(template);
-        log.info("[TemplateService] Saved template '{}' (id={}, provider={})",
-                saved.getName(), saved.getId(), saved.getProviderId());
+        log.info("[TemplateService] Saved template '{}' (id={}, user={})",
+                saved.getName(), saved.getId(), userId);
         return saved;
     }
 
-    /** Delete a template by ID — returns false if not found */
-    public boolean delete(UUID id) {
-        if (!repository.existsById(id)) {
-            return false;
+    public boolean delete(UUID id, UUID userId) {
+        Optional<Template> opt = repository.findById(id);
+        if (opt.isEmpty()) return false;
+
+        // Only owner can delete their template
+        Template template = opt.get();
+        if (userId != null && template.getUserId() != null
+                && !template.getUserId().equals(userId)) {
+            throw new SecurityException("Not authorised to delete this template");
         }
+
         repository.deleteById(id);
         log.info("[TemplateService] Deleted template id={}", id);
         return true;
     }
 
-    /** Duplicate a template — creates a new record with "Copy of <name>" */
-    public Template duplicate(UUID id) {
+    public Template duplicate(UUID id, UUID userId) {
         Template original = repository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Template not found: " + id));
 
@@ -88,9 +106,10 @@ public class TemplateService {
         copy.setFormState(original.getFormState());
         copy.setDescription(original.getDescription());
         copy.setTags(original.getTags());
+        copy.setUserId(userId); // Copy belongs to the requesting user
 
         Template saved = repository.save(copy);
-        log.info("[TemplateService] Duplicated template '{}' → '{}' (id={})",
+        log.info("[TemplateService] Duplicated '{}' -> '{}' (id={})",
                 original.getName(), saved.getName(), saved.getId());
         return saved;
     }

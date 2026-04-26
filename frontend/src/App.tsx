@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api, templateApi } from './api/client'
+import { api, setTokenProvider, setRefreshProvider, templateApi } from './api/client'
+import { useAuth } from './auth/AuthContext'
+import { AuthModal } from './components/AuthModal'
 import { CodePreview } from './components/CodePreview'
 import { ProviderTabs } from './components/ProviderTabs'
 import { SchemaForm } from './components/SchemaForm'
@@ -30,6 +32,16 @@ function buildDefaultState(schema: ProviderSchema): FormState {
 }
 
 export default function App() {
+  const { user, accessToken, isAuthenticated, isLoading, logout, refreshAccessToken } = useAuth()
+  const [authModalOpen, setAuthModalOpen] = useState(false)
+
+  // Wire access token and silent refresh into the API client.
+  // Both are updated together so the client always has a consistent pair.
+  useEffect(() => {
+    setTokenProvider(() => accessToken)
+    setRefreshProvider(refreshAccessToken)
+  }, [accessToken, refreshAccessToken])
+
   const [providers, setProviders] = useState<ProviderSummary[]>([])
   const [activeProviderId, setActiveProviderId] = useState<string | null>(null)
   const [schema, setSchema] = useState<ProviderSchema | null>(null)
@@ -46,7 +58,7 @@ export default function App() {
 
   const debouncedState = useDebounce(formState, 400)
 
-  // Auto-save
+  // Auto-save — only when authenticated
   const saveStatus = useAutoSave({
     templateId,
     templateName,
@@ -54,32 +66,23 @@ export default function App() {
     formState,
     onSaved: (saved: SavedTemplate) => setTemplateId(saved.id),
     delayMs: 30000,
+    enabled: isAuthenticated,
   })
 
-  // Load providers
   useEffect(() => {
     api.listProviders()
-      .then(list => {
-        setProviders(list)
-        if (list.length > 0) setActiveProviderId(list[0].id)
-      })
+      .then(list => { setProviders(list); if (list.length > 0) setActiveProviderId(list[0].id) })
       .catch(e => setError(`Failed to load providers: ${e.message}`))
   }, [])
 
-  // Load schema on provider change
   useEffect(() => {
     if (!activeProviderId) return
-    setSchema(null)
-    setGeneratedCode('')
+    setSchema(null); setGeneratedCode('')
     api.getSchema(activeProviderId)
-      .then(s => {
-        setSchema(s)
-        setFormState(buildDefaultState(s))
-      })
+      .then(s => { setSchema(s); setFormState(buildDefaultState(s)) })
       .catch(e => setError(`Failed to load schema: ${e.message}`))
   }, [activeProviderId])
 
-  // Auto-generate on form change
   useEffect(() => {
     if (!activeProviderId || Object.keys(debouncedState).length === 0) return
     api.generate(activeProviderId, debouncedState)
@@ -94,9 +97,8 @@ export default function App() {
       .catch(e => setError(`Generation error: ${e.message}`))
   }, [activeProviderId, formState])
 
-  // Manual save
   const handleManualSave = useCallback(async () => {
-    if (!templateName.trim() || !activeProviderId) return
+    if (!templateName.trim() || !activeProviderId || !isAuthenticated) return
     setManualSaving(true)
     try {
       const payload = { name: templateName, providerId: activeProviderId, formState }
@@ -111,19 +113,15 @@ export default function App() {
     } finally {
       setManualSaving(false)
     }
-  }, [templateName, activeProviderId, formState, templateId])
+  }, [templateName, activeProviderId, formState, templateId, isAuthenticated])
 
-  // Load a saved template from the drawer
   const handleLoadTemplate = useCallback((template: SavedTemplate) => {
-    const matchingProvider = providers.find(p => p.id === template.providerId)
-    if (!matchingProvider) return
     setActiveProviderId(template.providerId)
     setTemplateId(template.id)
     setTemplateName(template.name)
     setFormState(template.formState as FormState)
-  }, [providers])
+  }, [])
 
-  // Handle an imported template
   const handleImportTemplate = useCallback((template: SavedTemplate) => {
     setActiveProviderId(template.providerId)
     setTemplateId(template.id)
@@ -131,7 +129,6 @@ export default function App() {
     setFormState(template.formState as FormState)
   }, [])
 
-  // Clear template (new document)
   const handleClearTemplate = () => {
     setTemplateId(null)
     setTemplateName('')
@@ -140,8 +137,8 @@ export default function App() {
 
   const filename = schema ? `main${schema.fileExtension}` : 'main.tf'
 
-  // Save status label
   const statusLabel = () => {
+    if (!isAuthenticated) return ''
     if (manualSaving || saveStatus === 'saving') return '● Saving…'
     if (manualSaved || saveStatus === 'saved') return '✓ Saved'
     if (saveStatus === 'error') return '⚠ Save failed'
@@ -155,83 +152,92 @@ export default function App() {
     return 'var(--color-text-muted)'
   }
 
+  if (isLoading) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)', fontSize: '13px' }}>
+        Loading…
+      </div>
+    )
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
 
-      {/* Template drawer */}
-      <TemplateDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        onLoad={handleLoadTemplate}
-        onImport={handleImportTemplate}
-      />
+      <AuthModal open={authModalOpen} onClose={() => setAuthModalOpen(false)} />
+
+      {isAuthenticated && (
+        <TemplateDrawer
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          onLoad={handleLoadTemplate}
+          onImport={handleImportTemplate}
+        />
+      )}
 
       {/* Top bar */}
       <header style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '8px 16px',
-        borderBottom: '1px solid var(--color-border)',
-        flexShrink: 0, background: 'var(--color-bg)',
-        gap: '12px',
+        padding: '8px 16px', borderBottom: '1px solid var(--color-border)',
+        flexShrink: 0, background: 'var(--color-bg)', gap: '12px',
       }}>
-        {/* Left: library + brand + tabs */}
+        {/* Left */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-          <button
-            onClick={() => setDrawerOpen(true)}
-            title="Template library"
-            style={{
-              padding: '4px 10px', fontSize: '12px',
-              color: 'var(--color-text-secondary)',
-              background: 'none', border: '1px solid var(--color-border)',
-              borderRadius: 'var(--radius-md)', cursor: 'pointer', flexShrink: 0,
-            }}
-          >
-            Library
-          </button>
+          {isAuthenticated && (
+            <button
+              onClick={() => setDrawerOpen(true)}
+              style={{ padding: '4px 10px', fontSize: '12px', color: 'var(--color-text-secondary)', background: 'none', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', cursor: 'pointer', flexShrink: 0 }}
+            >
+              Library
+            </button>
+          )}
           <span style={{ fontSize: '13px', fontWeight: '500', flexShrink: 0 }}>InfraForge</span>
           {providers.length > 0 && (
-            <ProviderTabs providers={providers} activeId={activeProviderId} onSelect={id => {
-              setActiveProviderId(id)
-              setTemplateId(null)
-              setTemplateName('')
-            }} />
+            <ProviderTabs
+              providers={providers}
+              activeId={activeProviderId}
+              onSelect={id => { setActiveProviderId(id); setTemplateId(null); setTemplateName('') }}
+            />
           )}
         </div>
 
-        {/* Centre: template name + save status */}
+        {/* Centre — template name (auth only) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, justifyContent: 'center', minWidth: 0 }}>
-          <input
-            type="text"
-            value={templateName}
-            onChange={e => setTemplateName(e.target.value)}
-            placeholder="Name this template to save…"
-            style={{
-              fontSize: '13px', color: 'var(--color-text-primary)',
-              background: 'none', border: 'none', outline: 'none',
-              width: '260px', textAlign: 'center',
-              borderBottom: templateName ? '1px solid var(--color-border)' : '1px solid transparent',
-              padding: '2px 4px',
-            }}
-            onFocus={e => e.currentTarget.style.borderBottomColor = 'var(--color-border-strong)'}
-            onBlur={e => e.currentTarget.style.borderBottomColor = templateName ? 'var(--color-border)' : 'transparent'}
-          />
-          {templateName && (
-            <button
-              onClick={handleClearTemplate}
-              title="Clear template"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', fontSize: '14px', padding: '0 2px' }}
-            >×</button>
-          )}
-          {statusLabel() && (
-            <span style={{ fontSize: '11px', color: statusColor(), flexShrink: 0 }}>
-              {statusLabel()}
+          {isAuthenticated ? (
+            <>
+              <input
+                type="text"
+                value={templateName}
+                onChange={e => setTemplateName(e.target.value)}
+                placeholder="Name this template to save…"
+                style={{
+                  fontSize: '13px', color: 'var(--color-text-primary)',
+                  background: 'none', border: 'none', outline: 'none',
+                  width: '260px', textAlign: 'center',
+                  borderBottom: templateName ? '1px solid var(--color-border)' : '1px solid transparent',
+                  padding: '2px 4px',
+                }}
+                onFocus={e => e.currentTarget.style.borderBottomColor = 'var(--color-border-strong)'}
+                onBlur={e => e.currentTarget.style.borderBottomColor = templateName ? 'var(--color-border)' : 'transparent'}
+              />
+              {templateName && (
+                <button onClick={handleClearTemplate} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', fontSize: '14px', padding: '0 2px' }}>×</button>
+              )}
+              {statusLabel() && (
+                <span style={{ fontSize: '11px', color: statusColor(), flexShrink: 0 }}>
+                  {statusLabel()}
+                </span>
+              )}
+            </>
+          ) : (
+            <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+              Sign in to save templates
             </span>
           )}
         </div>
 
-        {/* Right: save button + version */}
+        {/* Right — save + auth */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-          {templateName && (
+          {isAuthenticated && templateName && (
             <button
               onClick={handleManualSave}
               disabled={manualSaving}
@@ -245,17 +251,37 @@ export default function App() {
               {manualSaved ? 'Saved ✓' : 'Save'}
             </button>
           )}
-          <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>v0.3.0</span>
+
+          {isAuthenticated ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>{user?.email}</span>
+              <button
+                onClick={logout}
+                style={{ padding: '4px 10px', fontSize: '11px', color: 'var(--color-text-secondary)', background: 'none', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
+              >
+                Sign out
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setAuthModalOpen(true)}
+              style={{
+                padding: '4px 12px', fontSize: '12px', fontWeight: '500',
+                color: 'var(--color-bg)', background: 'var(--color-accent)',
+                border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer',
+              }}
+            >
+              Sign in
+            </button>
+          )}
+
+          <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>v0.5.0</span>
         </div>
       </header>
 
       {/* Error banner */}
       {error && (
-        <div style={{
-          padding: '8px 16px', background: '#fff5f5',
-          borderBottom: '1px solid #fecaca',
-          fontSize: '12px', color: '#b91c1c', flexShrink: 0,
-        }}>
+        <div style={{ padding: '8px 16px', background: '#fff5f5', borderBottom: '1px solid #fecaca', fontSize: '12px', color: '#b91c1c', flexShrink: 0 }}>
           {error}
           <button onClick={() => setError(null)} style={{ marginLeft: '8px', background: 'none', border: 'none', cursor: 'pointer', color: '#b91c1c', fontSize: '12px' }}>✕</button>
         </div>
@@ -265,12 +291,7 @@ export default function App() {
       <main style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         <div style={{ flex: 1, borderRight: '1px solid var(--color-border)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           {schema ? (
-            <SchemaForm
-              schema={schema}
-              state={formState}
-              onChange={setFormState}
-              onGenerate={handleManualGenerate}
-            />
+            <SchemaForm schema={schema} state={formState} onChange={setFormState} onGenerate={handleManualGenerate} />
           ) : (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)', fontSize: '12px' }}>
               {providers.length === 0 ? 'Loading providers…' : 'Loading schema…'}

@@ -11,6 +11,7 @@ interface UseAutoSaveOptions {
   formState: FormState
   onSaved: (template: SavedTemplate) => void
   delayMs?: number
+  enabled?: boolean  // When false, auto-save is disabled (e.g. unauthenticated)
 }
 
 /**
@@ -27,14 +28,15 @@ export function useAutoSave({
   formState,
   onSaved,
   delayMs = 30000,
+  enabled = true,
 }: UseAutoSaveOptions): SaveStatus {
   const [status, setStatus] = useState<SaveStatus>('idle')
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSavedStateRef = useRef<string>('')
 
   useEffect(() => {
-    // Only auto-save when a name has been given
-    if (!templateName.trim() || !providerId) return
+    // Only auto-save when enabled and a name has been given
+    if (enabled === false || !templateName.trim() || !providerId) return
 
     const currentState = JSON.stringify(formState)
 

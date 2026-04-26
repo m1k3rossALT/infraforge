@@ -49,6 +49,10 @@ public class Template {
     @Column(columnDefinition = "text[]")
     private List<String> tags;
 
+    // Owner of this template — nullable for backward compatibility with pre-auth templates
+    @Column(name = "user_id")
+    private UUID userId;
+
     @PrePersist
     protected void onCreate() {
         generatedAt = OffsetDateTime.now();
@@ -85,4 +89,7 @@ public class Template {
 
     public List<String> getTags() { return tags; }
     public void setTags(List<String> tags) { this.tags = tags; }
+
+    public UUID getUserId() { return userId; }
+    public void setUserId(UUID userId) { this.userId = userId; }
 }
