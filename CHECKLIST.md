@@ -55,7 +55,7 @@ dependency for that phase, or because the risk of not having it grows significan
 ---
 
 ## Phase 3 — Template Management & Hardening
-> Status: 🔲 In Progress
+> Status: ✅ Complete — tagged v0.3.0
 
 ### 3a — Security fixes ✅
 - [x] 🔒 Fix directory traversal — validate provider ID against registry whitelist before
@@ -88,13 +88,13 @@ dependency for that phase, or because the risk of not having it grows significan
 - [x] TemplateRepository with provider-filtered and date-sorted queries
 - [x] TemplateService — save, update, find all, find by id, delete, duplicate
 
-### 3d — Template management features 🔲
+### 3d — Template management features ✅
 - [x] POST /api/v1/templates — create a new saved template
 - [x] PUT /api/v1/templates/{id} — update existing template (used by auto-save)
 - [x] GET /api/v1/templates — list all templates (summary only, no formState)
 - [x] GET /api/v1/templates/{id} — load a single template with full form state
 - [x] DELETE /api/v1/templates/{id} — delete a template with confirmation UI
-- [x] POST /api/v1/templates/{id}/duplicate — clone with "Copy of <name>"
+- [x] POST /api/v1/templates/{id}/duplicate — clone with "Copy of <n>"
 - [x] Frontend — sliding left drawer (TemplateDrawer) with template library
 - [x] Frontend — document title field in top bar, triggers save when named
 - [x] Frontend — manual Save button + "Saved" feedback
@@ -106,7 +106,7 @@ dependency for that phase, or because the risk of not having it grows significan
 - [x] Export as zip — download template file + metadata JSON in a single archive
 - [x] Import — upload an existing .tf / .yml / Vagrantfile and pre-fill the form
 
-### 3e — API versioning 🔲
+### 3e — API versioning ✅
 - [x] Template endpoints versioned under /api/v1/
 - [x] Provider endpoints migrated from /api/ to /api/v1/
 - [x] nginx proxy config updated to match v1 routes
@@ -138,24 +138,47 @@ dependency for that phase, or because the risk of not having it grows significan
 ---
 
 ## Phase 5 — Multi-User, Auth & Kubernetes
-> Status: 🔲 Future
+> Status: 🔲 In Progress
 
 ### 5a — Authentication & authorisation 🔒
-- [ ] 🔒 Spring Security dependency added
-- [ ] 🔒 JWT-based authentication — login endpoint, token issue and validation
-- [ ] 🔒 Refresh token flow
-- [ ] 🔒 RBAC — roles: viewer, editor, admin
-- [ ] 🔒 Endpoint protection — all /api/v1/* routes require valid token
-- [ ] 🔒 CSRF protection enabled
-- [ ] 🔒 Password hashing — BCrypt for stored credentials
+- [x] 🔒 Spring Security dependency added
+- [x] 🔒 JWT-based authentication — login endpoint, token issue and validation
+- [x] 🔒 Refresh token flow — rotation on every refresh, revocation on logout
+- [x] 🔒 BCrypt password hashing (cost factor 12)
+- [x] 🔒 Stateless session (STATELESS policy, CSRF disabled — correct for JWT APIs)
+- [x] 🔒 Endpoint protection — /api/v1/templates/** requires auth; providers + generate
+      are public (guest mode)
+- [x] 🔒 JSON 401/403 responses — no HTML redirects to break the React SPA
+- [x] 🔒 V2 migration — users + refresh_tokens tables, user_id FK on templates
+- [x] 🔒 V3 migration — fix user_role column type (VARCHAR replaces PostgreSQL native
+      ENUM to resolve JDBC prepared statement cast failure on register)
+- [x] 🔒 GET /api/v1/templates/{id} ownership check — 403 if caller is not the owner
+      (templates with null user_id are accessible — backward compat with Phase 3 data)
+- [x] 🔒 Export endpoint ownership check — same rule as getById
+- [x] Frontend — AuthContext with in-memory access token (never localStorage)
+- [x] Frontend — refresh token persisted in sessionStorage (survives page reload)
+- [x] Frontend — silent refresh on app load (reads sessionStorage on mount)
+- [x] Frontend — 401 interceptor in API client — transparent token refresh + retry
+- [x] Frontend — AuthModal (login / register toggle)
+- [x] Frontend — Sign in / Sign out in top bar, user email displayed
+- [x] Frontend — auto-save and template library gated on isAuthenticated
+- [ ] 🔒 RBAC — roles currently wired (VIEWER / EDITOR / ADMIN) but not enforced
+      at the endpoint level — add @PreAuthorize guards before v1.0
 - [ ] 🔒 HTTPS enforced — HTTP to HTTPS redirect in nginx
-- [ ] 🔒 Security headers — HSTS, X-Frame-Options, Content-Security-Policy in nginx config
+- [ ] 🔒 Security headers — HSTS, X-Frame-Options, Content-Security-Policy in nginx
+- [ ] 🔒 Move refresh token from sessionStorage to httpOnly SameSite=Strict cookie
+      (requires backend Set-Cookie on login/refresh, cookie-based logout endpoint;
+      deferred from v0.5.0 — acceptable for dev/staging, required before public launch)
 
 ### 5b — Multi-user features
-- [ ] User registration and login UI
-- [ ] Templates scoped to user — users only see their own templates
-- [ ] Template sharing — share a template read-only via a link
-- [ ] Team workspace — shared template library within a team
+- [ ] Templates scoped to user — enforced (listAll and getById already done in 5a)
+- [ ] Template sharing — GET /api/v1/shared/{shareToken} public read-only endpoint
+- [ ] Share link generation — POST /api/v1/templates/{id}/share, stores UUID token
+- [ ] Share link revocation — DELETE /api/v1/templates/{id}/share
+- [ ] V5 migration — add share_token UUID column to templates (nullable)
+- [ ] Frontend — "Share" button on saved templates, copies link to clipboard
+- [ ] Frontend — /shared/:token route, read-only builder view
+- [ ] Team workspace — shared template library within a team (future)
 
 ### 5c — Dependency security audit
 - [x] npm audit integrated into frontend Docker build — fail on high severity

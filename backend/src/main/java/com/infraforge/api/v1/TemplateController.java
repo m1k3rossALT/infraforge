@@ -61,9 +61,20 @@ public class TemplateController {
 
     @GetMapping("/{id}")
     public ResponseEntity<Template> getById(@PathVariable UUID id) {
-        return templateService.findById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        Optional<Template> opt = templateService.findById(id);
+        if (opt.isEmpty()) return ResponseEntity.notFound().build();
+
+        Template template = opt.get();
+        UUID userId = CurrentUser.id().orElse(null);
+
+        // Enforce ownership: if the template has an owner and the caller is not that owner, deny.
+        // Templates with userId=null (created before auth existed) remain accessible — backward compat.
+        // Note: Phase 5b share links use a separate /api/v1/shared/{shareToken} route, not this one.
+        if (template.getUserId() != null && !template.getUserId().equals(userId)) {
+            return ResponseEntity.status(403).build();
+        }
+
+        return ResponseEntity.ok(template);
     }
 
     @PostMapping
@@ -113,6 +124,13 @@ public class TemplateController {
         if (opt.isEmpty()) return ResponseEntity.notFound().build();
 
         Template template = opt.get();
+
+        // Ownership check — same rule as getById
+        UUID userId = CurrentUser.id().orElse(null);
+        if (template.getUserId() != null && !template.getUserId().equals(userId)) {
+            return ResponseEntity.status(403).build();
+        }
+
         String ext = providerRegistry.findById(template.getProviderId())
                 .map(s -> s.getFileExtension().replace(".", ""))
                 .orElse("txt");

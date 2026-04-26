@@ -8,16 +8,29 @@ import type {
 
 const BASE = '/api/v1'
 
-// Token provider — set by AuthContext after login
-let getAccessToken: (() => string | null) = () => null
+// ─── Token providers — set by AuthContext after login ─────────────────────────
+
+let getAccessToken: () => string | null = () => null
+let doRefresh: (() => Promise<string | null>) | null = null
 
 export function setTokenProvider(provider: () => string | null) {
   getAccessToken = provider
 }
 
-function authHeaders(): HeadersInit {
-  const token = getAccessToken()
-  return token ? { 'Authorization': `Bearer ${token}` } : {}
+/**
+ * Set the refresh function from AuthContext.
+ * When a request returns 401, the client will call this once to get a new
+ * access token and retry the original request transparently.
+ * If refresh fails (token expired/revoked), AuthContext clears auth state
+ * and the retry 401 is surfaced as a normal error.
+ */
+export function setRefreshProvider(provider: () => Promise<string | null>) {
+  doRefresh = provider
+}
+
+function authHeaders(token?: string | null): HeadersInit {
+  const t = token ?? getAccessToken()
+  return t ? { 'Authorization': `Bearer ${t}` } : {}
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -28,6 +41,25 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       ...(options?.headers ?? {}),
     },
   })
+
+  // Silent refresh on 401 — attempt once, then retry the original request
+  if (res.status === 401 && doRefresh) {
+    const newToken = await doRefresh()
+    if (newToken) {
+      const retryRes = await fetch(`${BASE}${path}`, {
+        ...options,
+        headers: {
+          ...authHeaders(newToken),
+          ...(options?.headers ?? {}),
+        },
+      })
+      if (!retryRes.ok) throw new Error(`${retryRes.status} ${retryRes.statusText}`)
+      if (retryRes.status === 204) return undefined as T
+      return retryRes.json() as Promise<T>
+    }
+    // Refresh failed — AuthContext already cleared auth state; surface the error
+  }
+
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>

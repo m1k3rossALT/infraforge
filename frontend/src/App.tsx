@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api, setTokenProvider, templateApi } from './api/client'
+import { api, setTokenProvider, setRefreshProvider, templateApi } from './api/client'
 import { useAuth } from './auth/AuthContext'
 import { AuthModal } from './components/AuthModal'
 import { CodePreview } from './components/CodePreview'
@@ -32,13 +32,15 @@ function buildDefaultState(schema: ProviderSchema): FormState {
 }
 
 export default function App() {
-  const { user, accessToken, isAuthenticated, isLoading, logout } = useAuth()
+  const { user, accessToken, isAuthenticated, isLoading, logout, refreshAccessToken } = useAuth()
   const [authModalOpen, setAuthModalOpen] = useState(false)
 
-  // Wire access token into the API client
+  // Wire access token and silent refresh into the API client.
+  // Both are updated together so the client always has a consistent pair.
   useEffect(() => {
     setTokenProvider(() => accessToken)
-  }, [accessToken])
+    setRefreshProvider(refreshAccessToken)
+  }, [accessToken, refreshAccessToken])
 
   const [providers, setProviders] = useState<ProviderSummary[]>([])
   const [activeProviderId, setActiveProviderId] = useState<string | null>(null)

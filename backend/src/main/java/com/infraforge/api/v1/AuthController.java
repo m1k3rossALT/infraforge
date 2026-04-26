@@ -32,7 +32,8 @@ public class AuthController {
         try {
             AuthDtos.AuthResponse response = authService.register(
                     request.getEmail(), request.getPassword());
-            return ResponseEntity.ok(response);
+            // 201 Created — a new user resource was created
+            return ResponseEntity.status(201).body(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
