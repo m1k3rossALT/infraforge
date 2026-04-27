@@ -15,7 +15,7 @@
   <properties>
     <java.version>21</java.version>
     <!-- Override Flyway to 10.x for PostgreSQL 16 support -->
-    <flyway.version>10.15.0</flyway.version>
+    <flyway.version>12.5.0</flyway.version>
   </properties>
   <dependencies>
     <dependency>
