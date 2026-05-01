@@ -1,14 +1,18 @@
-import { useCallback, useEffect, useState } from 'react'
-import { api, setTokenProvider, setRefreshProvider, templateApi } from './api/client'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { api, aiApi, setTokenProvider, setRefreshProvider, templateApi } from './api/client'
 import { useAuth } from './auth/AuthContext'
+import { AiBar } from './components/AiBar'
 import { AuthModal } from './components/AuthModal'
 import { CodePreview } from './components/CodePreview'
 import { ProviderTabs } from './components/ProviderTabs'
 import { SchemaForm } from './components/SchemaForm'
+import { SettingsDrawer } from './components/SettingsDrawer'
 import { TemplateDrawer } from './components/TemplateDrawer'
 import { useAutoSave } from './hooks/useAutoSave'
 import { useDebounce } from './hooks/useDebounce'
 import type {
+  AiSettings,
+  AiSuggestions,
   FormState,
   InstanceValues,
   ProviderSchema,
@@ -31,17 +35,19 @@ function buildDefaultState(schema: ProviderSchema): FormState {
   return state
 }
 
+const HIGHLIGHT_DURATION_MS = 2000
+
 export default function App() {
   const { user, accessToken, isAuthenticated, isLoading, logout, refreshAccessToken } = useAuth()
   const [authModalOpen, setAuthModalOpen] = useState(false)
 
-  // Wire access token and silent refresh into the API client.
-  // Both are updated together so the client always has a consistent pair.
+  // Wire token providers into the API client
   useEffect(() => {
     setTokenProvider(() => accessToken)
     setRefreshProvider(refreshAccessToken)
   }, [accessToken, refreshAccessToken])
 
+  // ─── Provider & Form state ──────────────────────────────────────────────────
   const [providers, setProviders] = useState<ProviderSummary[]>([])
   const [activeProviderId, setActiveProviderId] = useState<string | null>(null)
   const [schema, setSchema] = useState<ProviderSchema | null>(null)
@@ -49,16 +55,79 @@ export default function App() {
   const [generatedCode, setGeneratedCode] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  // Template state
+  // ─── Template state ────────────────────────────────────────────────────────
   const [templateId, setTemplateId] = useState<string | null>(null)
   const [templateName, setTemplateName] = useState('')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [manualSaving, setManualSaving] = useState(false)
   const [manualSaved, setManualSaved] = useState(false)
 
+  // ─── Settings drawer ───────────────────────────────────────────────────────
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsInitialTab, setSettingsInitialTab] = useState<'profile' | 'ai'>('profile')
+
+  const openSettings = useCallback((tab: 'profile' | 'ai' = 'profile') => {
+    setSettingsInitialTab(tab)
+    setSettingsOpen(true)
+  }, [])
+
+  // ─── AI state ─────────────────────────────────────────────────────────────
+  const [aiSettings, setAiSettings] = useState<AiSettings | null>(null)
+  const [highlightedFields, setHighlightedFields] = useState<Set<string>>(new Set())
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Load AI settings when user authenticates
+  useEffect(() => {
+    if (!isAuthenticated) { setAiSettings(null); return }
+    aiApi.getSettings()
+      .then(setAiSettings)
+      .catch(() => setAiSettings(null))
+  }, [isAuthenticated])
+
+  const handleAiFill = useCallback((suggestions: AiSuggestions) => {
+    setFormState(prev => {
+      const next = { ...prev }
+      const filledFieldIds = new Set<string>()
+
+      for (const [sectionId, fields] of Object.entries(suggestions)) {
+        if (!next[sectionId]) continue
+
+        // Enable the section if it was disabled and AI has suggestions for it
+        if (!next[sectionId].enabled) {
+          next[sectionId] = { ...next[sectionId], enabled: true }
+        }
+
+        const instances = [...next[sectionId].instances]
+        // Apply suggestions to first instance (non-repeatable sections)
+        instances[0] = { ...instances[0], ...fields }
+        next[sectionId] = { ...next[sectionId], instances }
+
+        for (const fieldId of Object.keys(fields)) {
+          filledFieldIds.add(fieldId)
+        }
+      }
+
+      // Clear any existing highlight timer and set new highlights
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current)
+      setHighlightedFields(filledFieldIds)
+      highlightTimerRef.current = setTimeout(
+        () => setHighlightedFields(new Set()),
+        HIGHLIGHT_DURATION_MS
+      )
+
+      return next
+    })
+  }, [])
+
+  const handleSuggest = useCallback(async (description: string): Promise<AiSuggestions> => {
+    if (!activeProviderId) return {}
+    const result = await aiApi.suggest(activeProviderId, description)
+    return result.suggestions
+  }, [activeProviderId])
+
+  // ─── Debounce & auto-generate ─────────────────────────────────────────────
   const debouncedState = useDebounce(formState, 400)
 
-  // Auto-save — only when authenticated
   const saveStatus = useAutoSave({
     templateId,
     templateName,
@@ -166,12 +235,21 @@ export default function App() {
       <AuthModal open={authModalOpen} onClose={() => setAuthModalOpen(false)} />
 
       {isAuthenticated && (
-        <TemplateDrawer
-          open={drawerOpen}
-          onClose={() => setDrawerOpen(false)}
-          onLoad={handleLoadTemplate}
-          onImport={handleImportTemplate}
-        />
+        <>
+          <TemplateDrawer
+            open={drawerOpen}
+            onClose={() => setDrawerOpen(false)}
+            onLoad={handleLoadTemplate}
+            onImport={handleImportTemplate}
+          />
+          <SettingsDrawer
+            open={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+            userEmail={user?.email}
+            onAiSettingsChange={s => setAiSettings(s)}
+            initialTab={settingsInitialTab}
+          />
+        </>
       )}
 
       {/* Top bar */}
@@ -200,7 +278,7 @@ export default function App() {
           )}
         </div>
 
-        {/* Centre — template name (auth only) */}
+        {/* Centre — template name */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, justifyContent: 'center', minWidth: 0 }}>
           {isAuthenticated ? (
             <>
@@ -235,7 +313,7 @@ export default function App() {
           )}
         </div>
 
-        {/* Right — save + auth */}
+        {/* Right — save + auth + settings */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
           {isAuthenticated && templateName && (
             <button
@@ -255,6 +333,18 @@ export default function App() {
           {isAuthenticated ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>{user?.email}</span>
+              {/* Settings icon */}
+              <button
+                onClick={() => openSettings('profile')}
+                title="Settings"
+                style={{
+                  padding: '4px 8px', fontSize: '14px',
+                  color: 'var(--color-text-muted)', background: 'none',
+                  border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', cursor: 'pointer',
+                }}
+              >
+                ⚙
+              </button>
               <button
                 onClick={logout}
                 style={{ padding: '4px 10px', fontSize: '11px', color: 'var(--color-text-secondary)', background: 'none', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
@@ -275,7 +365,7 @@ export default function App() {
             </button>
           )}
 
-          <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>v0.5.0</span>
+          <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>v0.7.0</span>
         </div>
       </header>
 
@@ -290,8 +380,26 @@ export default function App() {
       {/* Main split pane */}
       <main style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         <div style={{ flex: 1, borderRight: '1px solid var(--color-border)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+
+          {/* AI bar — shown only when authenticated and schema loaded */}
+          {isAuthenticated && schema && activeProviderId && (
+            <AiBar
+              providerId={activeProviderId}
+              aiSettings={aiSettings}
+              onFill={handleAiFill}
+              onOpenSettings={() => openSettings('ai')}
+              onSuggest={handleSuggest}
+            />
+          )}
+
           {schema ? (
-            <SchemaForm schema={schema} state={formState} onChange={setFormState} onGenerate={handleManualGenerate} />
+            <SchemaForm
+              schema={schema}
+              state={formState}
+              onChange={setFormState}
+              onGenerate={handleManualGenerate}
+              highlightedFields={highlightedFields}
+            />
           ) : (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)', fontSize: '12px' }}>
               {providers.length === 0 ? 'Loading providers…' : 'Loading schema…'}

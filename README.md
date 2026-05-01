@@ -169,7 +169,7 @@ const projectName = "${proj.project_name}";
 | 3 | ✅ Complete | Security hardening, observability, PostgreSQL, template management |
 | 4 | Future | AI-assisted field suggestions (hook points already in place) |
 | 5a | ✅ Complete | Spring Security, JWT auth, BCrypt, guest mode, template ownership |
-| 5b | 🔲 In Progress | Template sharing (share links), multi-user scoping |
+| 5b | ✅ Complete | Template sharing (share links), multi-user scoping |
 | 5c | ✅ Complete | Dependency audit (npm audit, OWASP Maven plugin) |
 | 5d | Future | Kubernetes (Helm chart, HPA, Ingress) |
 

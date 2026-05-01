@@ -1,20 +1,41 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Field } from '../types/schema'
 
 interface Props {
   field: Field
   value: string
   onChange: (value: string) => void
+  /** When true, briefly highlights the field to indicate AI has just filled it */
+  highlighted?: boolean
 }
 
-export function FieldRenderer({ field, value, onChange }: Props) {
+export function FieldRenderer({ field, value, onChange, highlighted = false }: Props) {
   const [showHelp, setShowHelp] = useState(false)
+  const [isHighlighted, setIsHighlighted] = useState(false)
+
+  // Flash highlight when the highlighted prop becomes true
+  useEffect(() => {
+    if (highlighted) {
+      setIsHighlighted(true)
+      const timer = setTimeout(() => setIsHighlighted(false), 1800)
+      return () => clearTimeout(timer)
+    }
+  }, [highlighted])
+
+  const highlightStyle: React.CSSProperties = isHighlighted ? {
+    outline: '2px solid var(--color-live)',
+    borderRadius: 'var(--radius-md)',
+    transition: 'outline 0.3s ease',
+  } : {}
 
   const labelRow = (
     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: field.type === 'toggle' ? '0' : '5px' }}>
       <label style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
         {field.label}
         {field.required && <span style={{ color: 'var(--color-text-muted)', marginLeft: '2px' }}>*</span>}
+        {isHighlighted && (
+          <span style={{ marginLeft: '6px', fontSize: '10px', color: 'var(--color-live)' }}>✨</span>
+        )}
       </label>
       {field.help && (
         <button
@@ -41,95 +62,16 @@ export function FieldRenderer({ field, value, onChange }: Props) {
     </p>
   )
 
-  const renderInput = () => {
-    if (field.type === 'toggle') {
-      return (
-        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: '14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
-            {labelRow}
-          </div>
-          <input
-            type="checkbox"
-            checked={value === 'true'}
-            onChange={e => onChange(e.target.checked ? 'true' : 'false')}
-            style={{ width: '15px', height: '15px', cursor: 'pointer', accentColor: 'var(--color-accent)', flexShrink: 0 }}
-          />
-        </label>
-      )
-    }
-
-    if (field.type === 'select') {
-      return (
-        <div style={{ marginBottom: '14px' }}>
-          {labelRow}
-          {helpText}
-          <select value={value} onChange={e => onChange(e.target.value)}>
-            {!field.required && <option value="">— optional —</option>}
-            {field.options?.map(opt => (
-              <option key={opt} value={opt}>{opt}</option>
-            ))}
-          </select>
-        </div>
-      )
-    }
-
-    if (field.type === 'textarea') {
-      return (
-        <div style={{ marginBottom: '14px' }}>
-          {labelRow}
-          {helpText}
-          <textarea
-            value={value}
-            onChange={e => onChange(e.target.value)}
-            placeholder={field.placeholder}
-            rows={4}
-            style={{ resize: 'vertical', fontFamily: 'var(--font-mono)', fontSize: '12px' }}
-          />
-        </div>
-      )
-    }
-
-    if (field.type === 'number') {
-      return (
-        <div style={{ marginBottom: '14px' }}>
-          {labelRow}
-          {helpText}
-          <input
-            type="number"
-            value={value}
-            onChange={e => onChange(e.target.value)}
-            placeholder={field.placeholder}
-            min="0"
-          />
-        </div>
-      )
-    }
-
-    // default: text
-    return (
-      <div style={{ marginBottom: '14px' }}>
-        {labelRow}
-        {helpText}
-        <input
-          type="text"
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          placeholder={field.placeholder}
-        />
-      </div>
-    )
-  }
-
-  // toggle renders its own layout to put label and checkbox inline
   if (field.type === 'toggle') {
     return (
-      <div style={{ marginBottom: '14px' }}>
+      <div style={{ marginBottom: '14px', ...highlightStyle }}>
         {helpText}
         <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
               {field.label}
               {field.required && <span style={{ color: 'var(--color-text-muted)', marginLeft: '2px' }}>*</span>}
+              {isHighlighted && <span style={{ marginLeft: '6px', fontSize: '10px', color: 'var(--color-live)' }}>✨</span>}
             </span>
             {field.help && (
               <button
@@ -155,5 +97,64 @@ export function FieldRenderer({ field, value, onChange }: Props) {
     )
   }
 
-  return renderInput()
+  if (field.type === 'select') {
+    return (
+      <div style={{ marginBottom: '14px', ...highlightStyle }}>
+        {labelRow}
+        {helpText}
+        <select value={value} onChange={e => onChange(e.target.value)}>
+          {!field.required && <option value="">— optional —</option>}
+          {field.options?.map(opt => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+        </select>
+      </div>
+    )
+  }
+
+  if (field.type === 'textarea') {
+    return (
+      <div style={{ marginBottom: '14px', ...highlightStyle }}>
+        {labelRow}
+        {helpText}
+        <textarea
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder={field.placeholder}
+          rows={4}
+          style={{ resize: 'vertical', fontFamily: 'var(--font-mono)', fontSize: '12px' }}
+        />
+      </div>
+    )
+  }
+
+  if (field.type === 'number') {
+    return (
+      <div style={{ marginBottom: '14px', ...highlightStyle }}>
+        {labelRow}
+        {helpText}
+        <input
+          type="number"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder={field.placeholder}
+          min="0"
+        />
+      </div>
+    )
+  }
+
+  // default: text
+  return (
+    <div style={{ marginBottom: '14px', ...highlightStyle }}>
+      {labelRow}
+      {helpText}
+      <input
+        type="text"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={field.placeholder}
+      />
+    </div>
+  )
 }

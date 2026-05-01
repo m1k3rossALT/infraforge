@@ -33,6 +33,13 @@ public class ProviderSchema {
         private int maxInstances = 10;
         private List<Field> fields;
 
+        /**
+         * Natural language description of what this section configures.
+         * Included in the AI prompt as context for this section.
+         * Example: "Configures the AWS provider region and authentication method."
+         */
+        private String aiHint;
+
         public String getId() { return id; }
         public void setId(String id) { this.id = id; }
         public String getLabel() { return label; }
@@ -47,6 +54,8 @@ public class ProviderSchema {
         public void setMaxInstances(int maxInstances) { this.maxInstances = maxInstances; }
         public List<Field> getFields() { return fields; }
         public void setFields(List<Field> fields) { this.fields = fields; }
+        public String getAiHint() { return aiHint; }
+        public void setAiHint(String aiHint) { this.aiHint = aiHint; }
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -59,7 +68,13 @@ public class ProviderSchema {
         private String placeholder;
         private String help;
         private String defaultValue;
-        private String aiHint; // reserved for Phase 4
+
+        /**
+         * Natural language hint for the AI about what this field configures.
+         * More specific than the label — used to improve suggestion accuracy.
+         * Example: "AWS region code where resources will be deployed."
+         */
+        private String aiHint;
 
         public String getId() { return id; }
         public void setId(String id) { this.id = id; }
