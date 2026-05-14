@@ -6,6 +6,8 @@ interface Props {
   state: FormState
   onChange: (state: FormState) => void
   onGenerate: () => void
+  /** Set of fieldIds filled by AI — triggers brief highlight on the affected fields */
+  highlightedFields?: Set<string>
 }
 
 function defaultInstance(section: Section): InstanceValues {
@@ -16,7 +18,7 @@ function defaultInstance(section: Section): InstanceValues {
   return inst
 }
 
-export function SchemaForm({ schema, state, onChange, onGenerate }: Props) {
+export function SchemaForm({ schema, state, onChange, onGenerate, highlightedFields }: Props) {
 
   const toggleSection = (sectionId: string, enabled: boolean) => {
     onChange({ ...state, [sectionId]: { ...state[sectionId], enabled } })
@@ -95,7 +97,6 @@ export function SchemaForm({ schema, state, onChange, onGenerate }: Props) {
                       background: 'var(--color-surface)',
                     } : {}}>
 
-                      {/* Instance header for repeatables */}
                       {section.repeatable && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                           <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
@@ -115,19 +116,18 @@ export function SchemaForm({ schema, state, onChange, onGenerate }: Props) {
                         </div>
                       )}
 
-                      {/* Fields */}
                       {section.fields.map(field => (
                         <FieldRenderer
                           key={field.id}
                           field={field}
                           value={instance[field.id] ?? ''}
                           onChange={v => updateField(section.id, index, field.id, v)}
+                          highlighted={highlightedFields?.has(field.id) ?? false}
                         />
                       ))}
                     </div>
                   ))}
 
-                  {/* Add instance button for repeatables */}
                   {section.repeatable && (
                     <button
                       onClick={() => addInstance(section.id, section)}

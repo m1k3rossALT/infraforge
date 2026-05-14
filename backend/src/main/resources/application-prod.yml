@@ -38,3 +38,14 @@ management:
   endpoint:
     health:
       show-details: never
+
+# ─── AI (Phase 4) ──────────────────────────────────────────────────────────
+# Required environment variables for production AI support:
+#
+#   INFRAFORGE_AI_ENCRYPTION_KEY  — exactly 32 characters, random, kept secret
+#                                   generate with: openssl rand -base64 24 | head -c 32
+#
+# Optional overrides (defaults defined in application.yml):
+#   INFRAFORGE_AI_RATE_LIMIT      — suggest requests per user per minute (default: 10)
+#
+# Phase 6 note: when platform-managed AI is added, add INFRAFORGE_AI_PLATFORM_KEY here.

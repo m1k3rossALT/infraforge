@@ -1,4 +1,6 @@
 import type {
+  AiSettings,
+  AiSuggestions,
   FormState,
   ProviderSchema,
   ProviderSummary,
@@ -18,13 +20,6 @@ export function setTokenProvider(provider: () => string | null) {
   getAccessToken = provider
 }
 
-/**
- * Set the refresh function from AuthContext.
- * When a request returns 401, the client will call this once to get a new
- * access token and retry the original request transparently.
- * If refresh fails (token expired/revoked), AuthContext clears auth state
- * and the retry 401 is surfaced as a normal error.
- */
 export function setRefreshProvider(provider: () => Promise<string | null>) {
   doRefresh = provider
 }
@@ -43,7 +38,6 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     },
   })
 
-  // Silent refresh on 401 — attempt once, then retry the original request
   if (res.status === 401 && doRefresh) {
     const newToken = await doRefresh()
     if (newToken) {
@@ -58,7 +52,6 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       if (retryRes.status === 204) return undefined as T
       return retryRes.json() as Promise<T>
     }
-    // Refresh failed — AuthContext already cleared auth state; surface the error
   }
 
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
@@ -163,26 +156,47 @@ export const templateApi = {
 // ─── Share API ────────────────────────────────────────────────────────────────
 
 export const shareApi = {
-  /**
-   * Generate a share token for a template. Idempotent.
-   * Returns { shareToken, shareUrl } from the backend.
-   */
   share: (id: string): Promise<{ shareToken: string; shareUrl: string }> =>
     request(`/templates/${id}/share`, { method: 'POST' }),
 
-  /**
-   * Revoke the share token. After this the share URL returns 404.
-   */
   unshare: (id: string): Promise<void> =>
     request(`/templates/${id}/share`, { method: 'DELETE' }),
 
-  /**
-   * Fetch a shared template by token. No auth required.
-   * Used by SharedView — called without the Authorization header.
-   */
   getShared: async (token: string): Promise<SharedTemplate> => {
     const res = await fetch(`${BASE}/shared/${token}`)
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
     return res.json()
   },
+}
+
+// ─── AI API ───────────────────────────────────────────────────────────────────
+
+export const aiApi = {
+  /** Generate field suggestions from a natural language description. */
+  suggest: (providerId: string, description: string): Promise<{ suggestions: AiSuggestions; provider: string | null }> =>
+    request(`/ai/suggest/${providerId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description }),
+    }),
+
+  /** Get current AI settings. Never returns the raw API key — only hasApiKey flag. */
+  getSettings: (): Promise<AiSettings> =>
+    request('/ai/settings'),
+
+  /** Save AI provider + API key. */
+  saveSettings: (aiProvider: string, apiKey: string, model?: string): Promise<AiSettings> =>
+    request('/ai/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ aiProvider, apiKey, model: model ?? null }),
+    }),
+
+  /** Remove AI configuration. */
+  deleteSettings: (): Promise<void> =>
+    request('/ai/settings', { method: 'DELETE' }),
+
+  /** List available AI provider names for the dropdown. */
+  listProviders: (): Promise<string[]> =>
+    request('/ai/providers'),
 }

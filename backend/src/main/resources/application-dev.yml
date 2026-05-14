@@ -38,3 +38,9 @@ management:
   endpoint:
     health:
       show-details: always
+
+# ─── AI (Phase 4) ──────────────────────────────────────────────────────────
+# AI suggest calls use the authenticated user's stored (encrypted) API key.
+# No platform key needed in dev — users must configure their own key in Settings.
+# The dev encryption key is set in application.yml — adequate for local dev only.
+# NOTE: if INFRAFORGE_AI_ENCRYPTION_KEY changes, all stored keys become unreadable.
