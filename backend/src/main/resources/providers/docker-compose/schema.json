@@ -1,0 +1,314 @@
+{
+  "id": "docker-compose",
+  "label": "Docker Compose",
+  "version": "1.0",
+  "fileExtension": ".yml",
+  "sections": [
+    {
+      "id": "compose_meta",
+      "label": "Compose File",
+      "optional": false,
+      "repeatable": false,
+      "aiHint": "Top-level metadata for the docker-compose.yml file.",
+      "fields": [
+        {
+          "id": "compose_version",
+          "label": "Compose file version",
+          "type": "select",
+          "options": ["3.9", "3.8", "3.7", "3"],
+          "required": true,
+          "defaultValue": "3.9",
+          "help": "3.9 is the latest stable version and supports all current features.",
+          "aiHint": "The Docker Compose file format version. 3.9 is recommended."
+        },
+        {
+          "id": "project_name",
+          "label": "Project name",
+          "type": "text",
+          "required": false,
+          "placeholder": "my-project",
+          "help": "Used as the prefix for container names and networks. Defaults to the directory name if omitted.",
+          "aiHint": "Name of the Compose project. Used as prefix for all resource names."
+        }
+      ]
+    },
+    {
+      "id": "service",
+      "label": "Service",
+      "optional": false,
+      "repeatable": true,
+      "maxInstances": 20,
+      "aiHint": "Defines a containerized service. Each service corresponds to one container or a set of identical containers.",
+      "fields": [
+        {
+          "id": "svc_name",
+          "label": "Service name",
+          "type": "text",
+          "required": true,
+          "placeholder": "app",
+          "help": "Used as the DNS hostname within the Compose network — other services reach this service by this name.",
+          "aiHint": "Name of the service e.g. app, api, frontend, backend, db, redis, nginx."
+        },
+        {
+          "id": "svc_image",
+          "label": "Image",
+          "type": "text",
+          "required": false,
+          "placeholder": "nginx:1.25",
+          "help": "Used when pulling from a registry. If 'Build context' is set, image acts as the tag for the built image.",
+          "aiHint": "Docker image to use e.g. postgres:16, redis:7-alpine, nginx:1.25. Leave blank if building from source."
+        },
+        {
+          "id": "svc_build_context",
+          "label": "Build context",
+          "type": "text",
+          "required": false,
+          "placeholder": "./backend",
+          "help": "Path to the directory containing the Dockerfile. Use when building from source.",
+          "aiHint": "Path to the directory containing the Dockerfile e.g. ., ./frontend, ./backend."
+        },
+        {
+          "id": "svc_build_dockerfile",
+          "label": "Dockerfile path",
+          "type": "text",
+          "required": false,
+          "placeholder": "Dockerfile",
+          "help": "Path to Dockerfile relative to the build context. Leave blank to use 'Dockerfile' in the context root.",
+          "aiHint": "Relative path to the Dockerfile. Leave blank for default Dockerfile."
+        },
+        {
+          "id": "svc_container_name",
+          "label": "Container name",
+          "type": "text",
+          "required": false,
+          "placeholder": "my-app-container",
+          "help": "Explicit container name. If omitted, Docker generates one from the project and service name.",
+          "aiHint": "Explicit container name. Leave blank to auto-generate."
+        },
+        {
+          "id": "svc_ports",
+          "label": "Port mappings (one per line)",
+          "type": "textarea",
+          "required": false,
+          "placeholder": "3000:3000\n8080:8080",
+          "help": "Format: HOST_PORT:CONTAINER_PORT. Use 127.0.0.1:3000:3000 to bind only to localhost.",
+          "aiHint": "Port mappings in HOST:CONTAINER format e.g. 3000:3000, 5432:5432, 80:8080."
+        },
+        {
+          "id": "svc_env_vars",
+          "label": "Environment variables (one per line)",
+          "type": "textarea",
+          "required": false,
+          "placeholder": "NODE_ENV=production\nPORT=3000",
+          "help": "Use KEY=VALUE format. For sensitive values use .env file or Docker secrets instead.",
+          "aiHint": "Environment variables in KEY=VALUE format for this service."
+        },
+        {
+          "id": "svc_env_file",
+          "label": "Env file path",
+          "type": "text",
+          "required": false,
+          "placeholder": ".env",
+          "help": "Path to a .env file to load variables from. Relative to the Compose file.",
+          "aiHint": "Path to .env file for loading environment variables e.g. .env, ./config/.env."
+        },
+        {
+          "id": "svc_volumes",
+          "label": "Volume mounts (one per line)",
+          "type": "textarea",
+          "required": false,
+          "placeholder": "postgres_data:/var/lib/postgresql/data\n./src:/app/src",
+          "help": "Format: VOLUME_NAME:CONTAINER_PATH or ./HOST_PATH:CONTAINER_PATH. Named volumes are managed by Docker.",
+          "aiHint": "Volume mounts. Use named_volume:/path for persistence or ./local:/container for dev hot reload."
+        },
+        {
+          "id": "svc_depends_on",
+          "label": "Depends on (one per line)",
+          "type": "textarea",
+          "required": false,
+          "placeholder": "db\nredis",
+          "help": "Service names this service starts after. Does not wait for the dependency to be ready — use healthchecks for that.",
+          "aiHint": "Services that must start before this one e.g. db, redis, message-broker."
+        },
+        {
+          "id": "svc_networks",
+          "label": "Networks (one per line)",
+          "type": "textarea",
+          "required": false,
+          "placeholder": "frontend\nbackend",
+          "help": "Networks this service joins. Services on the same network can communicate by service name.",
+          "aiHint": "Named networks this service should join. Services on the same network can communicate by name."
+        },
+        {
+          "id": "svc_restart",
+          "label": "Restart policy",
+          "type": "select",
+          "options": ["no", "always", "on-failure", "unless-stopped"],
+          "required": false,
+          "defaultValue": "unless-stopped",
+          "help": "unless-stopped is recommended for most services — restarts after crashes but not after docker stop.",
+          "aiHint": "When to restart the container. unless-stopped is recommended for production services."
+        },
+        {
+          "id": "svc_cpu_limit",
+          "label": "CPU limit",
+          "type": "text",
+          "required": false,
+          "placeholder": "0.5",
+          "help": "Maximum CPU cores this service may use. 0.5 = half a core. Requires Compose v3 with deploy settings.",
+          "aiHint": "Maximum CPU cores e.g. 0.5 for half a core, 1.0 for one full core."
+        },
+        {
+          "id": "svc_memory_limit",
+          "label": "Memory limit",
+          "type": "text",
+          "required": false,
+          "placeholder": "512m",
+          "help": "Maximum memory. Format: 512m, 1g. Prevents a service from consuming all host memory.",
+          "aiHint": "Maximum memory e.g. 256m, 512m, 1g."
+        },
+        {
+          "id": "svc_memory_reservation",
+          "label": "Memory reservation",
+          "type": "text",
+          "required": false,
+          "placeholder": "128m",
+          "help": "Soft limit — Docker tries to keep memory below this but allows bursting to the limit.",
+          "aiHint": "Soft memory reservation. Should be less than the memory limit."
+        },
+        {
+          "id": "svc_healthcheck_cmd",
+          "label": "Healthcheck command",
+          "type": "text",
+          "required": false,
+          "placeholder": "curl -f http://localhost:8080/health || exit 1",
+          "help": "Used with depends_on condition: service_healthy. Makes other services wait for this one to be ready.",
+          "aiHint": "Command to verify the service is healthy e.g. pg_isready -U postgres, curl -f http://localhost/health."
+        },
+        {
+          "id": "svc_healthcheck_interval",
+          "label": "Healthcheck interval",
+          "type": "text",
+          "required": false,
+          "placeholder": "10s",
+          "defaultValue": "10s",
+          "aiHint": "How often to run the healthcheck."
+        },
+        {
+          "id": "svc_healthcheck_retries",
+          "label": "Healthcheck retries",
+          "type": "number",
+          "required": false,
+          "placeholder": "5",
+          "defaultValue": "5",
+          "aiHint": "Number of consecutive failures before marking the service unhealthy."
+        },
+        {
+          "id": "svc_command",
+          "label": "Command override",
+          "type": "text",
+          "required": false,
+          "placeholder": "npm run start:prod",
+          "help": "Overrides the CMD from the Dockerfile.",
+          "aiHint": "Override the Dockerfile CMD e.g. npm run start:prod, python manage.py runserver."
+        },
+        {
+          "id": "svc_user",
+          "label": "User",
+          "type": "text",
+          "required": false,
+          "placeholder": "1001:1001",
+          "help": "Runs the container as a specific UID:GID. Overrides the USER in the Dockerfile.",
+          "aiHint": "UID:GID to run the container as for security e.g. 1001:1001."
+        }
+      ]
+    },
+    {
+      "id": "volume",
+      "label": "Named Volume",
+      "optional": true,
+      "defaultEnabled": false,
+      "repeatable": true,
+      "maxInstances": 20,
+      "aiHint": "Declares named volumes for persistent data storage managed by Docker.",
+      "fields": [
+        {
+          "id": "vol_name",
+          "label": "Volume name",
+          "type": "text",
+          "required": true,
+          "placeholder": "postgres_data",
+          "help": "Named volumes persist data between container restarts and recreations.",
+          "aiHint": "Name of the Docker volume e.g. postgres_data, redis_data, uploads."
+        },
+        {
+          "id": "vol_driver",
+          "label": "Driver",
+          "type": "text",
+          "required": false,
+          "placeholder": "local",
+          "defaultValue": "local",
+          "help": "local is the default. Use other drivers for NFS, cloud storage, etc.",
+          "aiHint": "Volume driver. local is standard. Use nfs or cloud-specific drivers for shared storage."
+        },
+        {
+          "id": "vol_external",
+          "label": "External volume",
+          "type": "toggle",
+          "required": false,
+          "defaultValue": "false",
+          "help": "If true, the volume must be created manually before running Compose. Compose will not create it.",
+          "aiHint": "Whether this volume is managed externally and must exist before running Compose."
+        }
+      ]
+    },
+    {
+      "id": "network",
+      "label": "Named Network",
+      "optional": true,
+      "defaultEnabled": false,
+      "repeatable": true,
+      "maxInstances": 10,
+      "aiHint": "Declares named networks for controlling service-to-service communication and isolation.",
+      "fields": [
+        {
+          "id": "net_name",
+          "label": "Network name",
+          "type": "text",
+          "required": true,
+          "placeholder": "frontend",
+          "help": "Services on the same network can reach each other by service name.",
+          "aiHint": "Name of the network e.g. frontend, backend, database."
+        },
+        {
+          "id": "net_driver",
+          "label": "Driver",
+          "type": "select",
+          "options": ["bridge", "host", "overlay", "none"],
+          "required": false,
+          "defaultValue": "bridge",
+          "help": "bridge is correct for single-host Compose. overlay is for Docker Swarm multi-host.",
+          "aiHint": "Network driver. bridge is standard for single-host setups."
+        },
+        {
+          "id": "net_external",
+          "label": "External network",
+          "type": "toggle",
+          "required": false,
+          "defaultValue": "false",
+          "help": "If true, the network must be created manually before running Compose.",
+          "aiHint": "Whether this network is managed externally and must exist before running Compose."
+        },
+        {
+          "id": "net_subnet",
+          "label": "Subnet (CIDR)",
+          "type": "text",
+          "required": false,
+          "placeholder": "172.20.0.0/16",
+          "help": "Optional custom subnet. Leave blank to let Docker auto-assign.",
+          "aiHint": "Custom subnet CIDR for the network e.g. 172.20.0.0/16. Leave blank for auto-assignment."
+        }
+      ]
+    }
+  ]
+}
