@@ -13,9 +13,11 @@ Built for engineers who know *what* infrastructure they want to build, but don't
 - **Schema-driven form UI** — fields, dropdowns, and help text generated from a provider schema. No hardcoded forms.
 - **Live code preview** — changes in the form reflect instantly in the output pane.
 - **Authentication** — register, login, and JWT-based sessions. Guest mode for generate/preview; auth required to save templates.
-- **Template library** — save, load, duplicate, and delete named templates. Auto-saves after 30 seconds of inactivity.
+- **Template library** — save, load, duplicate, delete, export, and import named templates. Auto-saves after 30 seconds of inactivity.
+- **Template sharing** — generate a public share link for any saved template. Recipients see a read-only code view with no account required.
+- **AI-assisted form filling** — describe what you want to build in plain English and let AI fill the form. Supports Gemini, OpenAI, Claude, Mistral, and Groq via your own API key (BYOK).
 - **Copy & download** — grab the generated file with one click.
-- **Plugin provider model** — adding a new IaC tool (Pulumi, Crossplane, AWS CDK, etc.) requires zero code changes. Drop a folder, restart.
+- **Plugin provider model** — adding a new IaC tool requires zero code changes. Drop a folder, restart.
 - **Docker-first** — runs locally with a single command. No external dependencies.
 
 ---
@@ -59,6 +61,17 @@ npm run dev
 # /api calls are proxied to the backend automatically via Vite config
 ```
 
+### Environment variables
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `INFRAFORGE_JWT_SECRET` | Prod | dev fallback | JWT signing secret — min 32 chars |
+| `INFRAFORGE_AI_ENCRYPTION_KEY` | Prod | dev fallback | AES-256 key for stored API keys — exactly 32 chars |
+| `INFRAFORGE_CORS_ORIGINS` | Prod | localhost | Comma-separated allowed origins |
+| `DB_URL` | Prod | docker default | PostgreSQL JDBC URL |
+| `DB_USERNAME` | Prod | docker default | PostgreSQL username |
+| `DB_PASSWORD` | Prod | docker default | PostgreSQL password |
+
 ---
 
 ## API Reference
@@ -96,6 +109,26 @@ npm run dev
 | `POST` | `/api/v1/templates/{id}/duplicate` | Clone a template |
 | `GET` | `/api/v1/templates/{id}/export` | Download template as a zip archive |
 | `POST` | `/api/v1/templates/import` | Import a `.tf`, `.yml`, or `Vagrantfile` |
+| `POST` | `/api/v1/templates/{id}/share` | Generate a public share token |
+| `DELETE` | `/api/v1/templates/{id}/share` | Revoke share token |
+
+### Shared View API (public)
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/v1/shared/{token}` | Fetch a shared template by token (no auth required) |
+
+### AI API (v1)
+
+> All endpoints require a valid `Authorization: Bearer <token>` header.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/v1/ai/suggest/{providerId}` | Generate field suggestions from a natural language description |
+| `GET` | `/api/v1/ai/settings` | Get current AI configuration (key never returned) |
+| `PUT` | `/api/v1/ai/settings` | Save AI provider and API key |
+| `DELETE` | `/api/v1/ai/settings` | Remove AI configuration |
+| `GET` | `/api/v1/ai/providers` | List available AI provider names |
 
 ### Actuator
 
@@ -103,6 +136,31 @@ npm run dev
 |---|---|---|
 | `GET` | `/actuator/health` | Application and DB health |
 | `GET` | `/actuator/info` | Build info |
+
+---
+
+## AI Feature (BYOK)
+
+InfraForge supports AI-assisted form filling via your own API key. No platform key required.
+
+**Supported providers:**
+
+| Provider | Default model |
+|---|---|
+| Google Gemini | gemini-2.0-flash |
+| OpenAI | gpt-4o-mini |
+| Anthropic Claude | claude-haiku-4-5-20251001 |
+| Mistral | mistral-small-latest |
+| Groq (Llama) | llama-3.3-70b-versatile |
+
+**How it works:**
+1. Sign in and open Settings (⚙ icon in the top bar)
+2. Go to the AI Provider tab, select your provider, and paste your API key
+3. The key is encrypted with AES-256-GCM and stored server-side — never returned after saving
+4. Click the ✨ bar above the form, describe what you want to build, and hit Fill
+5. The form fills automatically and the live preview updates instantly
+
+Rate limit: 10 suggestions per user per minute.
 
 ---
 
@@ -117,7 +175,7 @@ InfraForge uses a file-based plugin model. Every provider lives in its own folde
 backend/src/main/resources/providers/pulumi/
 ```
 
-2. Add `schema.json` — defines sections, fields, types, options, and help text:
+2. Add `schema.json` — defines sections, fields, types, options, help text, and optional AI hints:
 ```json
 {
   "id": "pulumi",
@@ -130,6 +188,7 @@ backend/src/main/resources/providers/pulumi/
       "label": "Project",
       "optional": false,
       "repeatable": false,
+      "aiHint": "Configures the Pulumi project name and runtime.",
       "fields": [
         {
           "id": "project_name",
@@ -137,7 +196,8 @@ backend/src/main/resources/providers/pulumi/
           "type": "text",
           "required": true,
           "placeholder": "my-infra",
-          "help": "Name of the Pulumi project."
+          "help": "Name of the Pulumi project.",
+          "aiHint": "The Pulumi project identifier used in Pulumi.yaml."
         }
       ]
     }
@@ -167,11 +227,13 @@ const projectName = "${proj.project_name}";
 | 1 | ✅ Complete | Terraform AWS builder, live preview, Docker |
 | 2 | ✅ Complete | Ansible (17 sections), Vagrant (19 sections), full provider coverage |
 | 3 | ✅ Complete | Security hardening, observability, PostgreSQL, template management |
-| 4 | Future | AI-assisted field suggestions (hook points already in place) |
+| 4 | ✅ Complete | AI-assisted form filling, BYOK (Gemini/OpenAI/Claude/Mistral/Groq), settings drawer |
 | 5a | ✅ Complete | Spring Security, JWT auth, BCrypt, guest mode, template ownership |
-| 5b | 🔲 In Progress | Template sharing (share links), multi-user scoping |
+| 5b | ✅ Complete | Template sharing (share links, revocation, read-only public view) |
 | 5c | ✅ Complete | Dependency audit (npm audit, OWASP Maven plugin) |
 | 5d | Future | Kubernetes (Helm chart, HPA, Ingress) |
+| 7 | Planned | Kubernetes YAML, Dockerfile, and Docker Compose providers |
+| 6 | Backlog | Subscription tiers, Stripe, platform-managed AI |
 
 ---
 

@@ -11,6 +11,9 @@ import java.util.UUID;
  *   - role enum supports future RBAC (VIEWER / EDITOR / ADMIN)
  *   - organizationId is nullable — reserved for Phase 5b team workspaces
  *   - enabled flag allows soft-disable without deleting the account
+ *   - aiProvider + aiApiKeyEnc + aiModel support Phase 4 BYOK AI suggestions
+ *
+ * Phase 6 note: add subscriptionStatus column here when Stripe integration is built.
  */
 @Entity
 @Table(name = "users")
@@ -32,7 +35,7 @@ public class User {
     @Column(nullable = false)
     private Role role = Role.EDITOR;
 
-    // Reserved for future org/team features
+    /** Reserved for future org/team features */
     @Column(name = "organization_id")
     private UUID organizationId;
 
@@ -44,6 +47,31 @@ public class User {
 
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
+
+    // ─── AI settings (Phase 4 — BYOK) ────────────────────────────────────────
+
+    /**
+     * AI provider identifier chosen by the user.
+     * Valid values: "gemini", "openai", "anthropic", "mistral", "groq"
+     * Null = no AI configured.
+     */
+    @Column(name = "ai_provider", length = 32)
+    private String aiProvider;
+
+    /**
+     * AES-256-GCM encrypted API key for the chosen provider.
+     * Format: Base64(IV[12 bytes] + ciphertext + tag)
+     * Null = no key stored.
+     */
+    @Column(name = "ai_api_key_enc", columnDefinition = "text")
+    private String aiApiKeyEnc;
+
+    /**
+     * Optional model override. Null = use the provider's default model defined in code.
+     * Stored as-is — not validated here, validated when making the API call.
+     */
+    @Column(name = "ai_model", length = 64)
+    private String aiModel;
 
     @PrePersist
     protected void onCreate() {
@@ -78,4 +106,13 @@ public class User {
 
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public OffsetDateTime getUpdatedAt() { return updatedAt; }
+
+    public String getAiProvider() { return aiProvider; }
+    public void setAiProvider(String aiProvider) { this.aiProvider = aiProvider; }
+
+    public String getAiApiKeyEnc() { return aiApiKeyEnc; }
+    public void setAiApiKeyEnc(String aiApiKeyEnc) { this.aiApiKeyEnc = aiApiKeyEnc; }
+
+    public String getAiModel() { return aiModel; }
+    public void setAiModel(String aiModel) { this.aiModel = aiModel; }
 }

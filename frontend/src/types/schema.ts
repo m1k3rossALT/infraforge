@@ -9,6 +9,7 @@ export interface Field {
   placeholder?: string
   help?: string
   defaultValue?: string
+  aiHint?: string
 }
 
 export interface Section {
@@ -19,6 +20,7 @@ export interface Section {
   repeatable: boolean
   maxInstances: number
   fields: Field[]
+  aiHint?: string  // natural language description of what this section configures
 }
 
 export interface ProviderSchema {
@@ -34,16 +36,13 @@ export interface ProviderSummary {
   label: string
 }
 
-// Per-instance field values (flat map of fieldId → string)
 export type InstanceValues = Record<string, string>
 
-// State for one section: enabled flag + list of instances
 export interface SectionState {
   enabled: boolean
   instances: InstanceValues[]
 }
 
-// Full form state: sectionId → SectionState
 export type FormState = Record<string, SectionState>
 
 // ─── Template management types ───────────────────────────────────────────────
@@ -55,7 +54,7 @@ export interface TemplateSummary {
   description?: string
   tags?: string[]
   updatedAt: string
-  shareToken?: string  // null/undefined = private; present = shared
+  shareToken?: string
 }
 
 export interface SavedTemplate {
@@ -72,12 +71,19 @@ export interface SavedTemplate {
 
 // ─── Shared view type ────────────────────────────────────────────────────────
 
-/**
- * Response from GET /api/v1/shared/{token}.
- * Contains only what is safe to expose publicly — no formState, no userId.
- */
 export interface SharedTemplate {
   name: string
   providerId: string
   generatedCode: string
 }
+
+// ─── AI types ────────────────────────────────────────────────────────────────
+
+export interface AiSettings {
+  aiProvider: string | null
+  hasApiKey: boolean
+  aiModel: string | null
+}
+
+/** Nested suggestions from POST /api/v1/ai/suggest/{providerId} */
+export type AiSuggestions = Record<string, Record<string, string>>
