@@ -23,18 +23,18 @@ import java.util.Map;
  * Spring Security configuration.
  *
  * Public endpoints:
- *   - /api/v1/auth/**       — register, login, refresh, logout
- *   - /api/v1/providers/**  — list providers, schema, generate (guest mode)
- *   - /api/v1/shared/**     — public read-only shared template views
- *   - /actuator/health|info — health checks
+ *   /api/v1/auth/**       — register, login, refresh, logout
+ *   /api/v1/providers/**  — list providers, schema, generate (guest mode)
+ *   /api/v1/shared/**     — public shared template views
+ *   /api/v1/prebuilts/**  — browse prebuilt templates (fork checks auth internally)
+ *   /actuator/health|info — health checks
  *
- * Protected endpoints (require valid JWT):
- *   - /api/v1/templates/**  — template management
- *   - /api/v1/ai/**         — AI suggestions and BYOK settings
- *   - /api/v1/**            — all other v1 endpoints default to authenticated
+ * Protected:
+ *   /api/v1/templates/**  — template management
+ *   /api/v1/ai/**         — AI suggestions and BYOK settings
+ *   /api/v1/**            — all other v1 routes
  *
- * Phase 6 note: when Stripe webhooks are added, add /api/v1/webhooks/stripe to permitAll
- * (webhook signature verification handles security — not JWT).
+ * Phase 6 hook: add /api/v1/webhooks/stripe to permitAll when Stripe is integrated.
  */
 @Configuration
 @EnableWebSecurity
@@ -57,6 +57,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 .requestMatchers("/api/v1/providers/**").permitAll()
                 .requestMatchers("/api/v1/shared/**").permitAll()
+                .requestMatchers("/api/v1/prebuilts/**").permitAll()
                 .requestMatchers("/api/v1/health", "/actuator/health", "/actuator/info").permitAll()
                 .requestMatchers("/api/v1/templates/**").authenticated()
                 .requestMatchers("/api/v1/ai/**").authenticated()

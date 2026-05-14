@@ -1,0 +1,51 @@
+{
+  "id": "k8s-web-app",
+  "name": "Single-service web app",
+  "description": "A production-ready Deployment with 2 replicas, resource limits, health probes, and a ClusterIP Service. Good starting point for any stateless HTTP service.",
+  "providerId": "kubernetes",
+  "tags": ["web", "deployment", "service", "production"],
+  "formState": {
+    "namespace":               { "enabled": false, "instances": [{}] },
+    "service_account":         { "enabled": false, "instances": [{}] },
+    "configmap":               { "enabled": false, "instances": [{}] },
+    "secret":                  { "enabled": false, "instances": [{}] },
+    "persistent_volume_claim": { "enabled": false, "instances": [{}] },
+    "deployment": {
+      "enabled": true,
+      "instances": [{
+        "app_name": "web-app",
+        "namespace": "default",
+        "replicas": "2",
+        "image": "nginx:1.25",
+        "container_port": "80",
+        "cpu_request": "100m",
+        "cpu_limit": "500m",
+        "memory_request": "128Mi",
+        "memory_limit": "512Mi",
+        "liveness_path": "/health",
+        "liveness_port": "80",
+        "readiness_path": "/ready",
+        "readiness_port": "80",
+        "restart_policy": "Always",
+        "image_pull_policy": "IfNotPresent",
+        "update_strategy": "RollingUpdate",
+        "max_surge": "1",
+        "max_unavailable": "0"
+      }]
+    },
+    "service": {
+      "enabled": true,
+      "instances": [{
+        "svc_name": "web-app-svc",
+        "svc_namespace": "default",
+        "svc_type": "ClusterIP",
+        "svc_port": "80",
+        "svc_target_port": "80",
+        "svc_selector_app": "web-app",
+        "svc_session_affinity": "None"
+      }]
+    },
+    "ingress": { "enabled": false, "instances": [{}] },
+    "hpa":     { "enabled": false, "instances": [{}] }
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "id": "dc-fullstack",
+  "name": "Full stack — frontend, backend, database",
+  "description": "Three-service stack: React frontend on port 80, Node.js API on port 3000, PostgreSQL database. Separate frontend and backend networks for isolation.",
+  "providerId": "docker-compose",
+  "tags": ["fullstack", "react", "node", "postgres", "nginx"],
+  "formState": {
+    "compose_meta": {
+      "enabled": true,
+      "instances": [{
+        "compose_version": "3.9",
+        "project_name": "fullstack-app"
+      }]
+    },
+    "service": {
+      "enabled": true,
+      "instances": [
+        {
+          "svc_name": "frontend",
+          "svc_image": "nginx:1.25-alpine",
+          "svc_build_context": "./frontend",
+          "svc_container_name": "",
+          "svc_ports": "80:80",
+          "svc_env_vars": "",
+          "svc_env_file": "",
+          "svc_volumes": "./frontend/nginx.conf:/etc/nginx/conf.d/default.conf",
+          "svc_depends_on": "backend",
+          "svc_networks": "frontend-network",
+          "svc_restart": "unless-stopped",
+          "svc_cpu_limit": "0.5",
+          "svc_memory_limit": "256m",
+          "svc_memory_reservation": "",
+          "svc_healthcheck_cmd": "",
+          "svc_healthcheck_interval": "10s",
+          "svc_healthcheck_retries": "5",
+          "svc_command": "",
+          "svc_user": ""
+        },
+        {
+          "svc_name": "backend",
+          "svc_image": "my-api:latest",
+          "svc_build_context": "./backend",
+          "svc_container_name": "",
+          "svc_ports": "3000:3000",
+          "svc_env_vars": "NODE_ENV=production\nPORT=3000\nDATABASE_URL=postgres://appuser:secret@db:5432/appdb",
+          "svc_env_file": ".env",
+          "svc_volumes": "",
+          "svc_depends_on": "db",
+          "svc_networks": "frontend-network\nbackend-network",
+          "svc_restart": "unless-stopped",
+          "svc_cpu_limit": "1.0",
+          "svc_memory_limit": "512m",
+          "svc_memory_reservation": "128m",
+          "svc_healthcheck_cmd": "curl -f http://localhost:3000/health || exit 1",
+          "svc_healthcheck_interval": "10s",
+          "svc_healthcheck_retries": "5",
+          "svc_command": "",
+          "svc_user": ""
+        },
+        {
+          "svc_name": "db",
+          "svc_image": "postgres:16-alpine",
+          "svc_build_context": "",
+          "svc_container_name": "",
+          "svc_ports": "",
+          "svc_env_vars": "POSTGRES_USER=appuser\nPOSTGRES_PASSWORD=secret\nPOSTGRES_DB=appdb",
+          "svc_env_file": "",
+          "svc_volumes": "postgres_data:/var/lib/postgresql/data",
+          "svc_depends_on": "",
+          "svc_networks": "backend-network",
+          "svc_restart": "unless-stopped",
+          "svc_cpu_limit": "",
+          "svc_memory_limit": "1g",
+          "svc_memory_reservation": "256m",
+          "svc_healthcheck_cmd": "pg_isready -U appuser -d appdb",
+          "svc_healthcheck_interval": "10s",
+          "svc_healthcheck_retries": "5",
+          "svc_command": "",
+          "svc_user": ""
+        }
+      ]
+    },
+    "volume": {
+      "enabled": true,
+      "instances": [{
+        "vol_name": "postgres_data",
+        "vol_driver": "local",
+        "vol_external": "false"
+      }]
+    },
+    "network": {
+      "enabled": true,
+      "instances": [
+        {
+          "net_name": "frontend-network",
+          "net_driver": "bridge",
+          "net_external": "false",
+          "net_subnet": ""
+        },
+        {
+          "net_name": "backend-network",
+          "net_driver": "bridge",
+          "net_external": "false",
+          "net_subnet": ""
+        }
+      ]
+    }
+  }
+}

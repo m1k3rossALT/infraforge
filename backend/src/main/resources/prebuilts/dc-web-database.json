@@ -1,0 +1,80 @@
+{
+  "id": "dc-web-database",
+  "name": "Web app + PostgreSQL",
+  "description": "A Node.js application service with a PostgreSQL database, named volume for data persistence, shared network, and health check on the database.",
+  "providerId": "docker-compose",
+  "tags": ["web", "postgres", "database", "node"],
+  "formState": {
+    "compose_meta": {
+      "enabled": true,
+      "instances": [{
+        "compose_version": "3.9",
+        "project_name": "my-project"
+      }]
+    },
+    "service": {
+      "enabled": true,
+      "instances": [
+        {
+          "svc_name": "app",
+          "svc_build_context": ".",
+          "svc_image": "my-app:latest",
+          "svc_container_name": "",
+          "svc_ports": "3000:3000",
+          "svc_env_vars": "NODE_ENV=production\nDATABASE_URL=postgres://appuser:secret@db:5432/appdb",
+          "svc_env_file": "",
+          "svc_volumes": "./logs:/app/logs",
+          "svc_depends_on": "db",
+          "svc_networks": "app-network",
+          "svc_restart": "unless-stopped",
+          "svc_cpu_limit": "",
+          "svc_memory_limit": "512m",
+          "svc_memory_reservation": "128m",
+          "svc_healthcheck_cmd": "",
+          "svc_healthcheck_interval": "10s",
+          "svc_healthcheck_retries": "5",
+          "svc_command": "",
+          "svc_user": ""
+        },
+        {
+          "svc_name": "db",
+          "svc_image": "postgres:16-alpine",
+          "svc_build_context": "",
+          "svc_container_name": "",
+          "svc_ports": "",
+          "svc_env_vars": "POSTGRES_USER=appuser\nPOSTGRES_PASSWORD=secret\nPOSTGRES_DB=appdb",
+          "svc_env_file": "",
+          "svc_volumes": "postgres_data:/var/lib/postgresql/data",
+          "svc_depends_on": "",
+          "svc_networks": "app-network",
+          "svc_restart": "unless-stopped",
+          "svc_cpu_limit": "",
+          "svc_memory_limit": "1g",
+          "svc_memory_reservation": "256m",
+          "svc_healthcheck_cmd": "pg_isready -U appuser -d appdb",
+          "svc_healthcheck_interval": "10s",
+          "svc_healthcheck_retries": "5",
+          "svc_command": "",
+          "svc_user": ""
+        }
+      ]
+    },
+    "volume": {
+      "enabled": true,
+      "instances": [{
+        "vol_name": "postgres_data",
+        "vol_driver": "local",
+        "vol_external": "false"
+      }]
+    },
+    "network": {
+      "enabled": true,
+      "instances": [{
+        "net_name": "app-network",
+        "net_driver": "bridge",
+        "net_external": "false",
+        "net_subnet": ""
+      }]
+    }
+  }
+}

@@ -35,19 +35,21 @@ function buildDefaultState(schema: ProviderSchema): FormState {
   return state
 }
 
+/** IDs prefixed with "prebuilt:" are read-only prebuilt previews */
+const isPrebuiltId = (id: string | null) => id?.startsWith('prebuilt:') ?? false
+
 const HIGHLIGHT_DURATION_MS = 2000
 
 export default function App() {
   const { user, accessToken, isAuthenticated, isLoading, logout, refreshAccessToken } = useAuth()
   const [authModalOpen, setAuthModalOpen] = useState(false)
 
-  // Wire token providers into the API client
   useEffect(() => {
     setTokenProvider(() => accessToken)
     setRefreshProvider(refreshAccessToken)
   }, [accessToken, refreshAccessToken])
 
-  // ─── Provider & Form state ──────────────────────────────────────────────────
+  // ─── Provider & Form state ────────────────────────────────────────────────
   const [providers, setProviders] = useState<ProviderSummary[]>([])
   const [activeProviderId, setActiveProviderId] = useState<string | null>(null)
   const [schema, setSchema] = useState<ProviderSchema | null>(null)
@@ -55,14 +57,17 @@ export default function App() {
   const [generatedCode, setGeneratedCode] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  // ─── Template state ────────────────────────────────────────────────────────
+  // ─── Template state ───────────────────────────────────────────────────────
   const [templateId, setTemplateId] = useState<string | null>(null)
   const [templateName, setTemplateName] = useState('')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [manualSaving, setManualSaving] = useState(false)
   const [manualSaved, setManualSaved] = useState(false)
 
-  // ─── Settings drawer ───────────────────────────────────────────────────────
+  /** True when currently previewing a prebuilt (not yet forked) */
+  const isPrebuilt = isPrebuiltId(templateId)
+
+  // ─── Settings drawer ──────────────────────────────────────────────────────
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsInitialTab, setSettingsInitialTab] = useState<'profile' | 'ai'>('profile')
 
@@ -76,45 +81,26 @@ export default function App() {
   const [highlightedFields, setHighlightedFields] = useState<Set<string>>(new Set())
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Load AI settings when user authenticates
   useEffect(() => {
     if (!isAuthenticated) { setAiSettings(null); return }
-    aiApi.getSettings()
-      .then(setAiSettings)
-      .catch(() => setAiSettings(null))
+    aiApi.getSettings().then(setAiSettings).catch(() => setAiSettings(null))
   }, [isAuthenticated])
 
   const handleAiFill = useCallback((suggestions: AiSuggestions) => {
     setFormState(prev => {
       const next = { ...prev }
-      const filledFieldIds = new Set<string>()
-
+      const filled = new Set<string>()
       for (const [sectionId, fields] of Object.entries(suggestions)) {
         if (!next[sectionId]) continue
-
-        // Enable the section if it was disabled and AI has suggestions for it
-        if (!next[sectionId].enabled) {
-          next[sectionId] = { ...next[sectionId], enabled: true }
-        }
-
+        if (!next[sectionId].enabled) next[sectionId] = { ...next[sectionId], enabled: true }
         const instances = [...next[sectionId].instances]
-        // Apply suggestions to first instance (non-repeatable sections)
         instances[0] = { ...instances[0], ...fields }
         next[sectionId] = { ...next[sectionId], instances }
-
-        for (const fieldId of Object.keys(fields)) {
-          filledFieldIds.add(fieldId)
-        }
+        for (const fieldId of Object.keys(fields)) filled.add(fieldId)
       }
-
-      // Clear any existing highlight timer and set new highlights
       if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current)
-      setHighlightedFields(filledFieldIds)
-      highlightTimerRef.current = setTimeout(
-        () => setHighlightedFields(new Set()),
-        HIGHLIGHT_DURATION_MS
-      )
-
+      setHighlightedFields(filled)
+      highlightTimerRef.current = setTimeout(() => setHighlightedFields(new Set()), HIGHLIGHT_DURATION_MS)
       return next
     })
   }, [])
@@ -129,13 +115,13 @@ export default function App() {
   const debouncedState = useDebounce(formState, 400)
 
   const saveStatus = useAutoSave({
-    templateId,
+    templateId: isPrebuilt ? null : templateId,
     templateName,
     providerId: activeProviderId,
     formState,
     onSaved: (saved: SavedTemplate) => setTemplateId(saved.id),
     delayMs: 30000,
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && !isPrebuilt,
   })
 
   useEffect(() => {
@@ -167,7 +153,7 @@ export default function App() {
   }, [activeProviderId, formState])
 
   const handleManualSave = useCallback(async () => {
-    if (!templateName.trim() || !activeProviderId || !isAuthenticated) return
+    if (!templateName.trim() || !activeProviderId || !isAuthenticated || isPrebuilt) return
     setManualSaving(true)
     try {
       const payload = { name: templateName, providerId: activeProviderId, formState }
@@ -182,20 +168,19 @@ export default function App() {
     } finally {
       setManualSaving(false)
     }
-  }, [templateName, activeProviderId, formState, templateId, isAuthenticated])
+  }, [templateName, activeProviderId, formState, templateId, isAuthenticated, isPrebuilt])
 
   const handleLoadTemplate = useCallback((template: SavedTemplate) => {
     setActiveProviderId(template.providerId)
     setTemplateId(template.id)
-    setTemplateName(template.name)
+    setTemplateName(isPrebuiltId(template.id) ? '' : template.name)
     setFormState(template.formState as FormState)
   }, [])
 
-  const handleImportTemplate = useCallback((template: SavedTemplate) => {
-    setActiveProviderId(template.providerId)
-    setTemplateId(template.id)
-    setTemplateName(template.name)
-    setFormState(template.formState as FormState)
+  const handleForkPrebuilt = useCallback((forked: SavedTemplate) => {
+    setTemplateId(forked.id)
+    setTemplateName(forked.name)
+    setFormState(forked.formState as FormState)
   }, [])
 
   const handleClearTemplate = () => {
@@ -207,7 +192,7 @@ export default function App() {
   const filename = schema ? `main${schema.fileExtension}` : 'main.tf'
 
   const statusLabel = () => {
-    if (!isAuthenticated) return ''
+    if (!isAuthenticated || isPrebuilt) return ''
     if (manualSaving || saveStatus === 'saving') return '● Saving…'
     if (manualSaved || saveStatus === 'saved') return '✓ Saved'
     if (saveStatus === 'error') return '⚠ Save failed'
@@ -234,22 +219,23 @@ export default function App() {
 
       <AuthModal open={authModalOpen} onClose={() => setAuthModalOpen(false)} />
 
+      <TemplateDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        onLoad={handleLoadTemplate}
+        onImport={handleLoadTemplate}
+        onForkPrebuilt={handleForkPrebuilt}
+        isAuthenticated={isAuthenticated}
+      />
+
       {isAuthenticated && (
-        <>
-          <TemplateDrawer
-            open={drawerOpen}
-            onClose={() => setDrawerOpen(false)}
-            onLoad={handleLoadTemplate}
-            onImport={handleImportTemplate}
-          />
-          <SettingsDrawer
-            open={settingsOpen}
-            onClose={() => setSettingsOpen(false)}
-            userEmail={user?.email}
-            onAiSettingsChange={s => setAiSettings(s)}
-            initialTab={settingsInitialTab}
-          />
-        </>
+        <SettingsDrawer
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          userEmail={user?.email}
+          onAiSettingsChange={s => setAiSettings(s)}
+          initialTab={settingsInitialTab}
+        />
       )}
 
       {/* Top bar */}
@@ -258,16 +244,13 @@ export default function App() {
         padding: '8px 16px', borderBottom: '1px solid var(--color-border)',
         flexShrink: 0, background: 'var(--color-bg)', gap: '12px',
       }}>
-        {/* Left */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-          {isAuthenticated && (
-            <button
-              onClick={() => setDrawerOpen(true)}
-              style={{ padding: '4px 10px', fontSize: '12px', color: 'var(--color-text-secondary)', background: 'none', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', cursor: 'pointer', flexShrink: 0 }}
-            >
-              Library
-            </button>
-          )}
+          <button
+            onClick={() => setDrawerOpen(true)}
+            style={{ padding: '4px 10px', fontSize: '12px', color: 'var(--color-text-secondary)', background: 'none', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', cursor: 'pointer', flexShrink: 0 }}
+          >
+            Library
+          </button>
           <span style={{ fontSize: '13px', fontWeight: '500', flexShrink: 0 }}>InfraForge</span>
           {providers.length > 0 && (
             <ProviderTabs
@@ -278,9 +261,13 @@ export default function App() {
           )}
         </div>
 
-        {/* Centre — template name */}
+        {/* Centre */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, justifyContent: 'center', minWidth: 0 }}>
-          {isAuthenticated ? (
+          {isPrebuilt ? (
+            <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+              Prebuilt preview — fork to save your changes
+            </span>
+          ) : isAuthenticated ? (
             <>
               <input
                 type="text"
@@ -301,21 +288,17 @@ export default function App() {
                 <button onClick={handleClearTemplate} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', fontSize: '14px', padding: '0 2px' }}>×</button>
               )}
               {statusLabel() && (
-                <span style={{ fontSize: '11px', color: statusColor(), flexShrink: 0 }}>
-                  {statusLabel()}
-                </span>
+                <span style={{ fontSize: '11px', color: statusColor(), flexShrink: 0 }}>{statusLabel()}</span>
               )}
             </>
           ) : (
-            <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-              Sign in to save templates
-            </span>
+            <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Sign in to save templates</span>
           )}
         </div>
 
-        {/* Right — save + auth + settings */}
+        {/* Right */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-          {isAuthenticated && templateName && (
+          {isAuthenticated && templateName && !isPrebuilt && (
             <button
               onClick={handleManualSave}
               disabled={manualSaving}
@@ -333,18 +316,11 @@ export default function App() {
           {isAuthenticated ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>{user?.email}</span>
-              {/* Settings icon */}
               <button
                 onClick={() => openSettings('profile')}
                 title="Settings"
-                style={{
-                  padding: '4px 8px', fontSize: '14px',
-                  color: 'var(--color-text-muted)', background: 'none',
-                  border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', cursor: 'pointer',
-                }}
-              >
-                ⚙
-              </button>
+                style={{ padding: '4px 8px', fontSize: '14px', color: 'var(--color-text-muted)', background: 'none', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
+              >⚙</button>
               <button
                 onClick={logout}
                 style={{ padding: '4px 10px', fontSize: '11px', color: 'var(--color-text-secondary)', background: 'none', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
@@ -364,10 +340,39 @@ export default function App() {
               Sign in
             </button>
           )}
-
-          <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>v0.7.0</span>
+          <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>v0.9.0</span>
         </div>
       </header>
+
+      {/* Prebuilt banner */}
+      {isPrebuilt && (
+        <div style={{
+          padding: '7px 16px', background: '#EEEDFE',
+          borderBottom: '1px solid #AFA9EC',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          fontSize: '12px', color: '#534AB7', flexShrink: 0,
+        }}>
+          <span>✨ Prebuilt template — preview only</span>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {isAuthenticated ? (
+              <button
+                onClick={() => setDrawerOpen(true)}
+                style={{ padding: '3px 10px', fontSize: '11px', fontWeight: '500', color: '#534AB7', background: 'white', border: '1px solid #AFA9EC', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
+              >
+                Fork &amp; edit →
+              </button>
+            ) : (
+              <button
+                onClick={() => setAuthModalOpen(true)}
+                style={{ padding: '3px 10px', fontSize: '11px', fontWeight: '500', color: '#534AB7', background: 'white', border: '1px solid #AFA9EC', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
+              >
+                Sign in to fork →
+              </button>
+            )}
+            <button onClick={handleClearTemplate} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#534AB7', fontSize: '14px' }}>×</button>
+          </div>
+        </div>
+      )}
 
       {/* Error banner */}
       {error && (
@@ -380,9 +385,7 @@ export default function App() {
       {/* Main split pane */}
       <main style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         <div style={{ flex: 1, borderRight: '1px solid var(--color-border)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-
-          {/* AI bar — shown only when authenticated and schema loaded */}
-          {isAuthenticated && schema && activeProviderId && (
+          {isAuthenticated && schema && activeProviderId && !isPrebuilt && (
             <AiBar
               providerId={activeProviderId}
               aiSettings={aiSettings}
@@ -391,12 +394,11 @@ export default function App() {
               onSuggest={handleSuggest}
             />
           )}
-
           {schema ? (
             <SchemaForm
               schema={schema}
               state={formState}
-              onChange={setFormState}
+              onChange={isPrebuilt ? () => {} : setFormState}
               onGenerate={handleManualGenerate}
               highlightedFields={highlightedFields}
             />
