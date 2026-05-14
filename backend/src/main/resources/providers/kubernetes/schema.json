@@ -1,0 +1,711 @@
+{
+  "id": "kubernetes",
+  "label": "Kubernetes",
+  "version": "1.0",
+  "fileExtension": ".yml",
+  "sections": [
+    {
+      "id": "namespace",
+      "label": "Namespace",
+      "optional": true,
+      "defaultEnabled": false,
+      "repeatable": false,
+      "aiHint": "Configures a Kubernetes Namespace to logically isolate resources within a cluster.",
+      "fields": [
+        {
+          "id": "namespace_name",
+          "label": "Namespace name",
+          "type": "text",
+          "required": true,
+          "placeholder": "my-app",
+          "help": "DNS-compatible name. Use lowercase letters, numbers, and hyphens only.",
+          "aiHint": "The name of the namespace. Use lowercase kebab-case e.g. production, staging, my-app."
+        },
+        {
+          "id": "namespace_env_label",
+          "label": "Environment label",
+          "type": "select",
+          "options": ["development", "staging", "production", "testing"],
+          "required": false,
+          "defaultValue": "production",
+          "help": "Applied as the 'environment' label on the namespace for filtering and policy targeting.",
+          "aiHint": "The environment this namespace represents."
+        }
+      ]
+    },
+    {
+      "id": "service_account",
+      "label": "Service Account",
+      "optional": true,
+      "defaultEnabled": false,
+      "repeatable": false,
+      "aiHint": "Configures a Kubernetes ServiceAccount for pod identity and RBAC. Used for IRSA (AWS) and Workload Identity (GCP).",
+      "fields": [
+        {
+          "id": "sa_name",
+          "label": "Service account name",
+          "type": "text",
+          "required": true,
+          "placeholder": "my-app-sa",
+          "help": "Name of the ServiceAccount. Referenced in pod spec via serviceAccountName.",
+          "aiHint": "Name of the service account, typically matching the app name."
+        },
+        {
+          "id": "sa_namespace",
+          "label": "Namespace",
+          "type": "text",
+          "required": true,
+          "placeholder": "default",
+          "defaultValue": "default",
+          "aiHint": "Namespace where the service account will be created."
+        },
+        {
+          "id": "sa_automount_token",
+          "label": "Automount API token",
+          "type": "toggle",
+          "required": false,
+          "defaultValue": "false",
+          "help": "Set to false to disable automatic token mounting for security. Only enable if the pod needs to call the Kubernetes API.",
+          "aiHint": "Whether to automatically mount the API token into pods using this service account."
+        },
+        {
+          "id": "sa_annotation_key",
+          "label": "Annotation key (e.g. for IRSA)",
+          "type": "text",
+          "required": false,
+          "placeholder": "eks.amazonaws.com/role-arn",
+          "help": "Used to link the service account to a cloud IAM role (AWS IRSA or GCP Workload Identity).",
+          "aiHint": "Annotation key for linking to a cloud IAM role, such as eks.amazonaws.com/role-arn for AWS."
+        },
+        {
+          "id": "sa_annotation_value",
+          "label": "Annotation value",
+          "type": "text",
+          "required": false,
+          "placeholder": "arn:aws:iam::123456789012:role/my-role",
+          "aiHint": "The IAM role ARN or service account email to associate with this Kubernetes service account."
+        }
+      ]
+    },
+    {
+      "id": "configmap",
+      "label": "ConfigMap",
+      "optional": true,
+      "defaultEnabled": false,
+      "repeatable": true,
+      "maxInstances": 10,
+      "aiHint": "Stores non-sensitive configuration as key-value pairs, mounted as environment variables or files into pods.",
+      "fields": [
+        {
+          "id": "cm_name",
+          "label": "ConfigMap name",
+          "type": "text",
+          "required": true,
+          "placeholder": "my-app-config",
+          "aiHint": "Name of the ConfigMap, typically appended with -config."
+        },
+        {
+          "id": "cm_namespace",
+          "label": "Namespace",
+          "type": "text",
+          "required": true,
+          "placeholder": "default",
+          "defaultValue": "default",
+          "aiHint": "Namespace where the ConfigMap will be created."
+        },
+        {
+          "id": "cm_data",
+          "label": "Data (key=value, one per line)",
+          "type": "textarea",
+          "required": false,
+          "placeholder": "APP_ENV=production\nLOG_LEVEL=info\nPORT=8080",
+          "help": "One key=value pair per line. Values are stored as plain text — use Secret for sensitive data.",
+          "aiHint": "Configuration key-value pairs. Each line is one entry in the format KEY=value."
+        }
+      ]
+    },
+    {
+      "id": "secret",
+      "label": "Secret",
+      "optional": true,
+      "defaultEnabled": false,
+      "repeatable": true,
+      "maxInstances": 10,
+      "aiHint": "Stores sensitive configuration such as passwords, API keys, and TLS certificates. Values are base64-encoded.",
+      "fields": [
+        {
+          "id": "secret_name",
+          "label": "Secret name",
+          "type": "text",
+          "required": true,
+          "placeholder": "my-app-secret",
+          "aiHint": "Name of the Secret, typically appended with -secret or -credentials."
+        },
+        {
+          "id": "secret_namespace",
+          "label": "Namespace",
+          "type": "text",
+          "required": true,
+          "placeholder": "default",
+          "defaultValue": "default",
+          "aiHint": "Namespace where the Secret will be created."
+        },
+        {
+          "id": "secret_type",
+          "label": "Secret type",
+          "type": "select",
+          "options": ["Opaque", "kubernetes.io/tls", "kubernetes.io/dockerconfigjson", "kubernetes.io/service-account-token", "kubernetes.io/basic-auth"],
+          "required": true,
+          "defaultValue": "Opaque",
+          "help": "Opaque is the generic type for arbitrary data. Use kubernetes.io/tls for TLS certificates.",
+          "aiHint": "The type of secret. Use Opaque for generic key-value secrets."
+        },
+        {
+          "id": "secret_data",
+          "label": "Data (key=base64value, one per line)",
+          "type": "textarea",
+          "required": false,
+          "placeholder": "DB_PASSWORD=cGFzc3dvcmQxMjM=\nAPI_KEY=bXlzZWNyZXRrZXk=",
+          "help": "Values must be base64-encoded. Use: echo -n 'myvalue' | base64",
+          "aiHint": "Secret key-value pairs. Values must be base64-encoded strings."
+        }
+      ]
+    },
+    {
+      "id": "persistent_volume_claim",
+      "label": "PersistentVolumeClaim",
+      "optional": true,
+      "defaultEnabled": false,
+      "repeatable": true,
+      "maxInstances": 10,
+      "aiHint": "Requests persistent storage for stateful workloads such as databases. The cluster provisions a PersistentVolume to satisfy the claim.",
+      "fields": [
+        {
+          "id": "pvc_name",
+          "label": "PVC name",
+          "type": "text",
+          "required": true,
+          "placeholder": "my-app-pvc",
+          "aiHint": "Name of the PersistentVolumeClaim, typically appended with -pvc."
+        },
+        {
+          "id": "pvc_namespace",
+          "label": "Namespace",
+          "type": "text",
+          "required": true,
+          "placeholder": "default",
+          "defaultValue": "default",
+          "aiHint": "Namespace where the PVC will be created."
+        },
+        {
+          "id": "pvc_storage_class",
+          "label": "Storage class",
+          "type": "text",
+          "required": false,
+          "placeholder": "standard",
+          "help": "Leave blank to use the cluster default storage class. Common values: standard, gp2, gp3, premium-rwo.",
+          "aiHint": "Storage class to use. Leave blank for default. Use gp2 or gp3 for AWS EKS, standard for GKE."
+        },
+        {
+          "id": "pvc_access_mode",
+          "label": "Access mode",
+          "type": "select",
+          "options": ["ReadWriteOnce", "ReadOnlyMany", "ReadWriteMany", "ReadWriteOncePod"],
+          "required": true,
+          "defaultValue": "ReadWriteOnce",
+          "help": "ReadWriteOnce (RWO) is supported by most block storage providers and is sufficient for most stateful apps.",
+          "aiHint": "How the volume can be mounted. ReadWriteOnce is standard for single-pod databases."
+        },
+        {
+          "id": "pvc_storage_size",
+          "label": "Storage size",
+          "type": "text",
+          "required": true,
+          "placeholder": "10Gi",
+          "defaultValue": "10Gi",
+          "help": "Size in Kubernetes resource format. e.g. 1Gi, 10Gi, 100Gi, 500Mi",
+          "aiHint": "Storage size in Gi or Mi format e.g. 10Gi for 10 gigabytes."
+        }
+      ]
+    },
+    {
+      "id": "deployment",
+      "label": "Deployment",
+      "optional": false,
+      "repeatable": false,
+      "aiHint": "Defines the desired state for a set of identical pods. Manages rolling updates, scaling, and self-healing.",
+      "fields": [
+        {
+          "id": "app_name",
+          "label": "App name",
+          "type": "text",
+          "required": true,
+          "placeholder": "my-app",
+          "help": "Used as the Deployment name and as the selector label. Must be DNS-compatible.",
+          "aiHint": "Name of the application. Used as the deployment name, pod label, and selector."
+        },
+        {
+          "id": "namespace",
+          "label": "Namespace",
+          "type": "text",
+          "required": true,
+          "placeholder": "default",
+          "defaultValue": "default",
+          "aiHint": "Namespace where the Deployment will be created."
+        },
+        {
+          "id": "replicas",
+          "label": "Replicas",
+          "type": "number",
+          "required": true,
+          "defaultValue": "2",
+          "help": "Number of pod replicas to maintain. For HA, use at least 2. If HPA is enabled this acts as the initial count.",
+          "aiHint": "Number of pod replicas. Use 2 or more for high availability."
+        },
+        {
+          "id": "image",
+          "label": "Container image",
+          "type": "text",
+          "required": true,
+          "placeholder": "nginx:1.25",
+          "help": "Full image reference including tag. Always pin a specific tag in production — never use :latest.",
+          "aiHint": "Docker image including tag e.g. nginx:1.25, my-app:v1.0.0, gcr.io/project/app:sha256."
+        },
+        {
+          "id": "container_port",
+          "label": "Container port",
+          "type": "number",
+          "required": true,
+          "defaultValue": "8080",
+          "help": "Port the application listens on inside the container.",
+          "aiHint": "The port the application listens on inside the container."
+        },
+        {
+          "id": "cpu_request",
+          "label": "CPU request",
+          "type": "text",
+          "required": false,
+          "placeholder": "100m",
+          "defaultValue": "100m",
+          "help": "Guaranteed CPU. Format: millicores (100m = 0.1 CPU) or whole cores (1). Scheduler uses this for placement.",
+          "aiHint": "CPU resources guaranteed to the container. 100m means 0.1 CPU core."
+        },
+        {
+          "id": "cpu_limit",
+          "label": "CPU limit",
+          "type": "text",
+          "required": false,
+          "placeholder": "500m",
+          "defaultValue": "500m",
+          "help": "Maximum CPU the container may use. Throttled if exceeded. Set higher than request.",
+          "aiHint": "Maximum CPU the container can use before being throttled."
+        },
+        {
+          "id": "memory_request",
+          "label": "Memory request",
+          "type": "text",
+          "required": false,
+          "placeholder": "128Mi",
+          "defaultValue": "128Mi",
+          "help": "Guaranteed memory. Format: Mi (mebibytes) or Gi (gibibytes). Pod is evicted if it exceeds its limit.",
+          "aiHint": "Memory guaranteed to the container e.g. 128Mi, 256Mi, 512Mi, 1Gi."
+        },
+        {
+          "id": "memory_limit",
+          "label": "Memory limit",
+          "type": "text",
+          "required": false,
+          "placeholder": "512Mi",
+          "defaultValue": "512Mi",
+          "help": "Maximum memory. Container is OOMKilled if it exceeds this. Set higher than request.",
+          "aiHint": "Maximum memory the container can use before being killed."
+        },
+        {
+          "id": "env_configmap_ref",
+          "label": "ConfigMap ref (envFrom)",
+          "type": "text",
+          "required": false,
+          "placeholder": "my-app-config",
+          "help": "Name of a ConfigMap to load as environment variables via envFrom. Must exist in the same namespace.",
+          "aiHint": "Name of a ConfigMap to inject as environment variables into the container."
+        },
+        {
+          "id": "env_secret_ref",
+          "label": "Secret ref (envFrom)",
+          "type": "text",
+          "required": false,
+          "placeholder": "my-app-secret",
+          "help": "Name of a Secret to load as environment variables via envFrom. Must exist in the same namespace.",
+          "aiHint": "Name of a Secret to inject as environment variables into the container."
+        },
+        {
+          "id": "volume_mount_name",
+          "label": "Volume mount name",
+          "type": "text",
+          "required": false,
+          "placeholder": "data",
+          "help": "Name of the volume to mount. Must match a PVC name or emptyDir volume defined in the spec.",
+          "aiHint": "Name of the volume to mount into the container. References a PVC or emptyDir."
+        },
+        {
+          "id": "volume_mount_path",
+          "label": "Volume mount path",
+          "type": "text",
+          "required": false,
+          "placeholder": "/data",
+          "help": "Directory inside the container where the volume is mounted.",
+          "aiHint": "File system path inside the container where the volume will be mounted e.g. /data, /var/lib/postgresql."
+        },
+        {
+          "id": "liveness_path",
+          "label": "Liveness probe path",
+          "type": "text",
+          "required": false,
+          "placeholder": "/health",
+          "help": "HTTP GET path for liveness probe. Container is restarted if this returns non-2xx. Leave blank to disable.",
+          "aiHint": "HTTP endpoint for liveness check e.g. /health, /ping, /actuator/health."
+        },
+        {
+          "id": "liveness_port",
+          "label": "Liveness probe port",
+          "type": "number",
+          "required": false,
+          "placeholder": "8080",
+          "aiHint": "Port to use for the liveness probe HTTP request."
+        },
+        {
+          "id": "readiness_path",
+          "label": "Readiness probe path",
+          "type": "text",
+          "required": false,
+          "placeholder": "/ready",
+          "help": "HTTP GET path for readiness probe. Pod only receives traffic when this returns 2xx.",
+          "aiHint": "HTTP endpoint for readiness check. Pod only receives traffic when this passes."
+        },
+        {
+          "id": "readiness_port",
+          "label": "Readiness probe port",
+          "type": "number",
+          "required": false,
+          "placeholder": "8080",
+          "aiHint": "Port to use for the readiness probe HTTP request."
+        },
+        {
+          "id": "restart_policy",
+          "label": "Restart policy",
+          "type": "select",
+          "options": ["Always", "OnFailure", "Never"],
+          "required": true,
+          "defaultValue": "Always",
+          "help": "Always is correct for Deployments. OnFailure/Never are for Jobs.",
+          "aiHint": "When to restart containers. Always is standard for long-running services."
+        },
+        {
+          "id": "image_pull_policy",
+          "label": "Image pull policy",
+          "type": "select",
+          "options": ["IfNotPresent", "Always", "Never"],
+          "required": true,
+          "defaultValue": "IfNotPresent",
+          "help": "IfNotPresent is recommended for pinned tags. Use Always only with :latest (which itself is not recommended).",
+          "aiHint": "When to pull the container image from the registry."
+        },
+        {
+          "id": "service_account_name",
+          "label": "Service account name",
+          "type": "text",
+          "required": false,
+          "placeholder": "default",
+          "help": "ServiceAccount to assign to pods. Leave blank to use the namespace default.",
+          "aiHint": "Name of the ServiceAccount to use for pods in this deployment."
+        },
+        {
+          "id": "update_strategy",
+          "label": "Update strategy",
+          "type": "select",
+          "options": ["RollingUpdate", "Recreate"],
+          "required": true,
+          "defaultValue": "RollingUpdate",
+          "help": "RollingUpdate replaces pods gradually with zero downtime. Recreate terminates all pods before starting new ones.",
+          "aiHint": "How pods are updated. RollingUpdate is zero-downtime; Recreate is simpler but causes downtime."
+        },
+        {
+          "id": "max_surge",
+          "label": "Max surge",
+          "type": "text",
+          "required": false,
+          "placeholder": "1",
+          "defaultValue": "1",
+          "help": "Max extra pods above desired replica count during rolling update. Can be a number or percentage e.g. 25%",
+          "aiHint": "Maximum extra pods allowed during a rolling update."
+        },
+        {
+          "id": "max_unavailable",
+          "label": "Max unavailable",
+          "type": "text",
+          "required": false,
+          "placeholder": "0",
+          "defaultValue": "0",
+          "help": "Max pods that can be unavailable during rolling update. 0 means always maintain full replica count.",
+          "aiHint": "Maximum number of pods that can be unavailable during a rolling update."
+        }
+      ]
+    },
+    {
+      "id": "service",
+      "label": "Service",
+      "optional": true,
+      "defaultEnabled": true,
+      "repeatable": false,
+      "aiHint": "Exposes the Deployment as a network service within the cluster or externally.",
+      "fields": [
+        {
+          "id": "svc_name",
+          "label": "Service name",
+          "type": "text",
+          "required": true,
+          "placeholder": "my-app-svc",
+          "help": "DNS name used to reach the service from within the cluster.",
+          "aiHint": "Name of the Service. Used as the DNS name within the cluster."
+        },
+        {
+          "id": "svc_namespace",
+          "label": "Namespace",
+          "type": "text",
+          "required": true,
+          "placeholder": "default",
+          "defaultValue": "default",
+          "aiHint": "Namespace where the Service will be created. Must match the Deployment namespace."
+        },
+        {
+          "id": "svc_type",
+          "label": "Service type",
+          "type": "select",
+          "options": ["ClusterIP", "NodePort", "LoadBalancer", "ExternalName"],
+          "required": true,
+          "defaultValue": "ClusterIP",
+          "help": "ClusterIP: internal only. NodePort: exposed on each node. LoadBalancer: creates a cloud load balancer.",
+          "aiHint": "How the service is exposed. ClusterIP for internal, LoadBalancer for public internet access."
+        },
+        {
+          "id": "svc_port",
+          "label": "Service port",
+          "type": "number",
+          "required": true,
+          "defaultValue": "80",
+          "help": "Port exposed on the Service. Clients connect to this port.",
+          "aiHint": "Port that clients connect to on the Service."
+        },
+        {
+          "id": "svc_target_port",
+          "label": "Target port",
+          "type": "number",
+          "required": true,
+          "defaultValue": "8080",
+          "help": "Port on the container the service forwards to. Must match the container port in the Deployment.",
+          "aiHint": "Port on the container to forward traffic to. Must match the container port."
+        },
+        {
+          "id": "svc_selector_app",
+          "label": "Selector app label",
+          "type": "text",
+          "required": true,
+          "placeholder": "my-app",
+          "help": "Must match the app label on the pods in the target Deployment.",
+          "aiHint": "Must exactly match the app_name field in the Deployment to route traffic correctly."
+        },
+        {
+          "id": "svc_node_port",
+          "label": "Node port (NodePort/LoadBalancer only)",
+          "type": "number",
+          "required": false,
+          "placeholder": "30080",
+          "help": "Static port on each node. Must be in range 30000-32767. Leave blank for auto-assignment.",
+          "aiHint": "Static node port in range 30000-32767. Leave blank to auto-assign."
+        },
+        {
+          "id": "svc_session_affinity",
+          "label": "Session affinity",
+          "type": "select",
+          "options": ["None", "ClientIP"],
+          "required": false,
+          "defaultValue": "None",
+          "help": "ClientIP pins a client to the same pod for the session duration. Use for stateful apps without external session storage.",
+          "aiHint": "None distributes traffic freely. ClientIP sticks a client to the same pod."
+        }
+      ]
+    },
+    {
+      "id": "ingress",
+      "label": "Ingress",
+      "optional": true,
+      "defaultEnabled": false,
+      "repeatable": false,
+      "aiHint": "Routes external HTTP/HTTPS traffic to Services based on host and path rules. Requires an Ingress Controller installed in the cluster.",
+      "fields": [
+        {
+          "id": "ingress_name",
+          "label": "Ingress name",
+          "type": "text",
+          "required": true,
+          "placeholder": "my-app-ingress",
+          "aiHint": "Name of the Ingress resource."
+        },
+        {
+          "id": "ingress_namespace",
+          "label": "Namespace",
+          "type": "text",
+          "required": true,
+          "placeholder": "default",
+          "defaultValue": "default",
+          "aiHint": "Namespace where the Ingress will be created."
+        },
+        {
+          "id": "ingress_class",
+          "label": "Ingress class",
+          "type": "select",
+          "options": ["nginx", "traefik", "haproxy", "alb", "gce", "istio"],
+          "required": false,
+          "defaultValue": "nginx",
+          "help": "Must match the ingress controller installed in your cluster.",
+          "aiHint": "The ingress controller to use. nginx is most common."
+        },
+        {
+          "id": "ingress_host",
+          "label": "Hostname",
+          "type": "text",
+          "required": true,
+          "placeholder": "myapp.example.com",
+          "help": "Fully qualified domain name. Must be configured in DNS to point to the ingress controller.",
+          "aiHint": "The domain name for the application e.g. myapp.example.com."
+        },
+        {
+          "id": "ingress_path",
+          "label": "Path",
+          "type": "text",
+          "required": true,
+          "placeholder": "/",
+          "defaultValue": "/",
+          "aiHint": "URL path prefix to route e.g. / for all traffic or /api for API routes only."
+        },
+        {
+          "id": "ingress_path_type",
+          "label": "Path type",
+          "type": "select",
+          "options": ["Prefix", "Exact", "ImplementationSpecific"],
+          "required": true,
+          "defaultValue": "Prefix",
+          "help": "Prefix matches any path starting with the specified prefix. Exact matches only the exact path.",
+          "aiHint": "How the path is matched. Prefix for most use cases."
+        },
+        {
+          "id": "ingress_service_name",
+          "label": "Backend service name",
+          "type": "text",
+          "required": true,
+          "placeholder": "my-app-svc",
+          "help": "Must match the Service name in the same namespace.",
+          "aiHint": "Name of the Service to route traffic to. Must exist in the same namespace."
+        },
+        {
+          "id": "ingress_service_port",
+          "label": "Backend service port",
+          "type": "number",
+          "required": true,
+          "defaultValue": "80",
+          "aiHint": "Port on the Service to route traffic to."
+        },
+        {
+          "id": "ingress_tls_enabled",
+          "label": "Enable TLS",
+          "type": "toggle",
+          "required": false,
+          "defaultValue": "false",
+          "help": "Enables HTTPS. Requires a TLS Secret in the same namespace with the certificate and key.",
+          "aiHint": "Enable HTTPS termination at the ingress."
+        },
+        {
+          "id": "ingress_tls_secret",
+          "label": "TLS secret name",
+          "type": "text",
+          "required": false,
+          "placeholder": "my-app-tls",
+          "help": "Name of the Kubernetes Secret containing the TLS certificate and key. Type must be kubernetes.io/tls.",
+          "aiHint": "Name of the Secret containing the TLS certificate and private key."
+        }
+      ]
+    },
+    {
+      "id": "hpa",
+      "label": "HorizontalPodAutoscaler",
+      "optional": true,
+      "defaultEnabled": false,
+      "repeatable": false,
+      "aiHint": "Automatically scales the number of pod replicas based on CPU or memory utilisation.",
+      "fields": [
+        {
+          "id": "hpa_name",
+          "label": "HPA name",
+          "type": "text",
+          "required": true,
+          "placeholder": "my-app-hpa",
+          "aiHint": "Name of the HorizontalPodAutoscaler resource."
+        },
+        {
+          "id": "hpa_namespace",
+          "label": "Namespace",
+          "type": "text",
+          "required": true,
+          "placeholder": "default",
+          "defaultValue": "default",
+          "aiHint": "Namespace where the HPA will be created."
+        },
+        {
+          "id": "hpa_target_name",
+          "label": "Target deployment name",
+          "type": "text",
+          "required": true,
+          "placeholder": "my-app",
+          "help": "Must match the name of the Deployment this HPA scales.",
+          "aiHint": "The name of the Deployment to scale. Must match the app_name in the Deployment section."
+        },
+        {
+          "id": "hpa_min_replicas",
+          "label": "Min replicas",
+          "type": "number",
+          "required": true,
+          "defaultValue": "2",
+          "help": "Minimum number of pods. Should be at least 2 for HA.",
+          "aiHint": "Minimum number of pods to keep running. Use 2 or more for high availability."
+        },
+        {
+          "id": "hpa_max_replicas",
+          "label": "Max replicas",
+          "type": "number",
+          "required": true,
+          "defaultValue": "10",
+          "help": "Maximum pods the HPA will scale to. Keep this bounded to control cloud costs.",
+          "aiHint": "Maximum number of pods the autoscaler can create."
+        },
+        {
+          "id": "hpa_cpu_target",
+          "label": "CPU target utilisation (%)",
+          "type": "number",
+          "required": false,
+          "defaultValue": "70",
+          "help": "Scale up when average CPU across all pods exceeds this percentage. 70% is a good starting point.",
+          "aiHint": "Target CPU utilisation percentage to trigger scaling. 70 is a sensible default."
+        },
+        {
+          "id": "hpa_memory_target",
+          "label": "Memory target utilisation (%)",
+          "type": "number",
+          "required": false,
+          "placeholder": "80",
+          "help": "Scale up when average memory across all pods exceeds this percentage. Leave blank to disable memory-based scaling.",
+          "aiHint": "Target memory utilisation percentage. Leave blank to scale on CPU only."
+        }
+      ]
+    }
+  ]
+}

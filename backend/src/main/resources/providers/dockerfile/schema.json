@@ -1,0 +1,383 @@
+{
+  "id": "dockerfile",
+  "label": "Dockerfile",
+  "version": "1.0",
+  "fileExtension": "",
+  "sections": [
+    {
+      "id": "base",
+      "label": "Base Image",
+      "optional": false,
+      "repeatable": false,
+      "aiHint": "Defines the starting image for the Docker build. Every Dockerfile starts with a FROM instruction.",
+      "fields": [
+        {
+          "id": "base_image",
+          "label": "Base image",
+          "type": "text",
+          "required": true,
+          "placeholder": "node:20-alpine",
+          "help": "Always pin a specific tag. Prefer slim or alpine variants to reduce image size.",
+          "aiHint": "The base Docker image and tag e.g. node:20-alpine, python:3.12-slim, openjdk:21-jre-alpine, nginx:1.25."
+        },
+        {
+          "id": "use_build_stage",
+          "label": "Multi-stage build",
+          "type": "toggle",
+          "required": false,
+          "defaultValue": "false",
+          "help": "Multi-stage builds separate the build environment from the runtime image, producing much smaller final images.",
+          "aiHint": "Whether to use a multi-stage build to separate build dependencies from the final runtime image."
+        },
+        {
+          "id": "build_stage_image",
+          "label": "Build stage image",
+          "type": "text",
+          "required": false,
+          "placeholder": "node:20-alpine",
+          "help": "Image used in the build stage. Only applies when multi-stage build is enabled.",
+          "aiHint": "The image for the build stage when using multi-stage builds e.g. maven:3.9-eclipse-temurin-21 for Java."
+        },
+        {
+          "id": "runtime_stage_image",
+          "label": "Runtime stage image",
+          "type": "text",
+          "required": false,
+          "placeholder": "node:20-alpine",
+          "help": "Minimal image for the final runtime stage. Should be smaller than the build stage image.",
+          "aiHint": "The minimal runtime image for the final stage e.g. eclipse-temurin:21-jre-alpine, nginx:alpine."
+        }
+      ]
+    },
+    {
+      "id": "workdir",
+      "label": "Working Directory",
+      "optional": false,
+      "repeatable": false,
+      "aiHint": "Sets the working directory inside the container for all subsequent instructions.",
+      "fields": [
+        {
+          "id": "workdir_path",
+          "label": "Working directory",
+          "type": "text",
+          "required": true,
+          "placeholder": "/app",
+          "defaultValue": "/app",
+          "help": "All subsequent COPY, RUN, CMD instructions are relative to this directory.",
+          "aiHint": "The working directory inside the container e.g. /app, /usr/src/app, /opt/app."
+        }
+      ]
+    },
+    {
+      "id": "labels",
+      "label": "Labels",
+      "optional": true,
+      "defaultEnabled": false,
+      "repeatable": false,
+      "aiHint": "Metadata labels applied to the image for documentation and tooling.",
+      "fields": [
+        {
+          "id": "label_maintainer",
+          "label": "Maintainer",
+          "type": "text",
+          "required": false,
+          "placeholder": "team@example.com",
+          "aiHint": "Email or name of the team or person maintaining this image."
+        },
+        {
+          "id": "label_version",
+          "label": "Version",
+          "type": "text",
+          "required": false,
+          "placeholder": "1.0.0",
+          "aiHint": "Version of the application in this image."
+        },
+        {
+          "id": "label_description",
+          "label": "Description",
+          "type": "text",
+          "required": false,
+          "placeholder": "My application",
+          "aiHint": "Short description of what this image contains."
+        }
+      ]
+    },
+    {
+      "id": "env_vars",
+      "label": "Environment Variables",
+      "optional": true,
+      "defaultEnabled": false,
+      "repeatable": true,
+      "maxInstances": 30,
+      "aiHint": "Sets environment variables available during build and at runtime.",
+      "fields": [
+        {
+          "id": "env_key",
+          "label": "Variable name",
+          "type": "text",
+          "required": true,
+          "placeholder": "NODE_ENV",
+          "help": "Use UPPER_SNAKE_CASE for environment variable names.",
+          "aiHint": "Environment variable name in UPPER_SNAKE_CASE."
+        },
+        {
+          "id": "env_value",
+          "label": "Value",
+          "type": "text",
+          "required": true,
+          "placeholder": "production",
+          "help": "For secrets, do not hardcode values here — inject them at runtime with docker run -e or via orchestration secrets.",
+          "aiHint": "Default value for the environment variable. Avoid hardcoding secrets here."
+        }
+      ]
+    },
+    {
+      "id": "copy_deps",
+      "label": "Copy Dependency Files",
+      "optional": true,
+      "defaultEnabled": true,
+      "repeatable": false,
+      "aiHint": "Copies dependency manifest files before source code to maximise Docker layer caching.",
+      "fields": [
+        {
+          "id": "dep_files",
+          "label": "Dependency files (one per line)",
+          "type": "textarea",
+          "required": false,
+          "placeholder": "package.json\npackage-lock.json",
+          "help": "Copy dependency manifests before source code to leverage Docker layer caching. When only source code changes, the dependency install layer is reused.",
+          "aiHint": "Dependency manifest filenames to copy before source e.g. package.json and package-lock.json for Node, pom.xml for Maven, requirements.txt for Python."
+        }
+      ]
+    },
+    {
+      "id": "install_deps",
+      "label": "Install Dependencies",
+      "optional": true,
+      "defaultEnabled": true,
+      "repeatable": false,
+      "aiHint": "Runs the package manager install command to install application dependencies.",
+      "fields": [
+        {
+          "id": "install_cmd",
+          "label": "Install command",
+          "type": "text",
+          "required": true,
+          "placeholder": "npm ci --only=production",
+          "defaultValue": "npm ci --only=production",
+          "help": "Use ci instead of install for reproducible builds. --only=production omits devDependencies.",
+          "aiHint": "The command to install dependencies e.g. npm ci, pip install -r requirements.txt, mvn dependency:resolve."
+        }
+      ]
+    },
+    {
+      "id": "copy_source",
+      "label": "Copy Source Code",
+      "optional": true,
+      "defaultEnabled": true,
+      "repeatable": false,
+      "aiHint": "Copies the application source code into the container image.",
+      "fields": [
+        {
+          "id": "copy_src",
+          "label": "Source path",
+          "type": "text",
+          "required": true,
+          "placeholder": ".",
+          "defaultValue": ".",
+          "help": "Use .dockerignore to exclude node_modules, .git, build artifacts, and sensitive files.",
+          "aiHint": "Source path to copy from the build context. Usually . for the entire project."
+        },
+        {
+          "id": "copy_dest",
+          "label": "Destination path",
+          "type": "text",
+          "required": true,
+          "placeholder": ".",
+          "defaultValue": ".",
+          "aiHint": "Destination inside the container. Usually . to copy into the working directory."
+        }
+      ]
+    },
+    {
+      "id": "build_cmd",
+      "label": "Build Command",
+      "optional": true,
+      "defaultEnabled": false,
+      "repeatable": false,
+      "aiHint": "Runs the build step to compile or bundle the application e.g. npm run build, mvn package.",
+      "fields": [
+        {
+          "id": "build_command",
+          "label": "Build command",
+          "type": "text",
+          "required": true,
+          "placeholder": "npm run build",
+          "aiHint": "The build command e.g. npm run build, mvn package -DskipTests, go build -o app ."
+        }
+      ]
+    },
+    {
+      "id": "run_commands",
+      "label": "Additional RUN Commands",
+      "optional": true,
+      "defaultEnabled": false,
+      "repeatable": true,
+      "maxInstances": 20,
+      "aiHint": "Executes shell commands during the image build e.g. creating directories, setting permissions, installing system packages.",
+      "fields": [
+        {
+          "id": "run_cmd",
+          "label": "Command",
+          "type": "text",
+          "required": true,
+          "placeholder": "chmod +x /app/start.sh",
+          "help": "Chain related commands with && to minimise image layers. Clean up package manager caches in the same RUN instruction.",
+          "aiHint": "Shell command to run during build e.g. apt-get install -y curl, chmod +x /app/start.sh, adduser --system appuser."
+        }
+      ]
+    },
+    {
+      "id": "expose",
+      "label": "Expose Ports",
+      "optional": true,
+      "defaultEnabled": true,
+      "repeatable": true,
+      "maxInstances": 10,
+      "aiHint": "Documents which ports the container listens on. EXPOSE is documentation only — actual port publishing requires -p in docker run or ports in Compose.",
+      "fields": [
+        {
+          "id": "expose_port",
+          "label": "Port",
+          "type": "number",
+          "required": true,
+          "placeholder": "8080",
+          "defaultValue": "8080",
+          "aiHint": "Port the application listens on inside the container."
+        },
+        {
+          "id": "expose_protocol",
+          "label": "Protocol",
+          "type": "select",
+          "options": ["tcp", "udp"],
+          "required": false,
+          "defaultValue": "tcp",
+          "aiHint": "Transport protocol. TCP is correct for HTTP/HTTPS and most application ports."
+        }
+      ]
+    },
+    {
+      "id": "user",
+      "label": "Non-Root User",
+      "optional": true,
+      "defaultEnabled": false,
+      "repeatable": false,
+      "aiHint": "Creates and switches to a non-root user for security. Best practice for production images.",
+      "fields": [
+        {
+          "id": "user_name",
+          "label": "Username",
+          "type": "text",
+          "required": true,
+          "placeholder": "appuser",
+          "defaultValue": "appuser",
+          "help": "Running as root inside a container is a security risk. Always use a non-root user in production.",
+          "aiHint": "Name of the non-root user to create and run the application as."
+        },
+        {
+          "id": "user_uid",
+          "label": "UID",
+          "type": "number",
+          "required": false,
+          "placeholder": "1001",
+          "defaultValue": "1001",
+          "help": "Use a UID above 1000 to avoid conflicts with system users.",
+          "aiHint": "Numeric user ID. Use a value above 1000."
+        }
+      ]
+    },
+    {
+      "id": "healthcheck",
+      "label": "Healthcheck",
+      "optional": true,
+      "defaultEnabled": false,
+      "repeatable": false,
+      "aiHint": "Defines how Docker checks if the container is healthy. Used by orchestrators like Compose and Swarm.",
+      "fields": [
+        {
+          "id": "healthcheck_cmd",
+          "label": "Healthcheck command",
+          "type": "text",
+          "required": true,
+          "placeholder": "curl -f http://localhost:8080/health || exit 1",
+          "help": "Command must return 0 for healthy, 1 for unhealthy. curl or wget are commonly used.",
+          "aiHint": "Command to check container health e.g. curl -f http://localhost:8080/health || exit 1."
+        },
+        {
+          "id": "healthcheck_interval",
+          "label": "Interval",
+          "type": "text",
+          "required": false,
+          "placeholder": "30s",
+          "defaultValue": "30s",
+          "aiHint": "How often to run the healthcheck e.g. 30s."
+        },
+        {
+          "id": "healthcheck_timeout",
+          "label": "Timeout",
+          "type": "text",
+          "required": false,
+          "placeholder": "10s",
+          "defaultValue": "10s",
+          "aiHint": "How long to wait for the healthcheck to complete before marking it failed."
+        },
+        {
+          "id": "healthcheck_retries",
+          "label": "Retries",
+          "type": "number",
+          "required": false,
+          "placeholder": "3",
+          "defaultValue": "3",
+          "aiHint": "Number of consecutive failures before the container is considered unhealthy."
+        }
+      ]
+    },
+    {
+      "id": "entrypoint",
+      "label": "Entrypoint & CMD",
+      "optional": false,
+      "repeatable": false,
+      "aiHint": "Defines how the container starts. ENTRYPOINT sets the executable; CMD provides default arguments.",
+      "fields": [
+        {
+          "id": "entrypoint_type",
+          "label": "Start type",
+          "type": "select",
+          "options": ["CMD only", "ENTRYPOINT + CMD", "ENTRYPOINT only"],
+          "required": true,
+          "defaultValue": "CMD only",
+          "help": "CMD only is simplest. ENTRYPOINT + CMD is best for production — ENTRYPOINT is the executable, CMD provides overridable args.",
+          "aiHint": "How to start the container. CMD only for simple cases. ENTRYPOINT + CMD for production."
+        },
+        {
+          "id": "entrypoint_cmd",
+          "label": "ENTRYPOINT",
+          "type": "text",
+          "required": false,
+          "placeholder": "node",
+          "help": "The executable to run. Use exec form: node, java, python, nginx, etc.",
+          "aiHint": "The executable to run as the entrypoint e.g. node, java, python, nginx, /app/start.sh."
+        },
+        {
+          "id": "cmd_args",
+          "label": "CMD / arguments",
+          "type": "text",
+          "required": true,
+          "placeholder": "server.js",
+          "help": "With ENTRYPOINT: arguments passed to the entrypoint. Without: the full command to run.",
+          "aiHint": "The command or arguments e.g. server.js, -jar app.jar, manage.py runserver, -g daemon off; for nginx."
+        }
+      ]
+    }
+  ]
+}
