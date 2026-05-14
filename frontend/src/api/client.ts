@@ -2,6 +2,7 @@ import type {
   AiSettings,
   AiSuggestions,
   FormState,
+  PrebuiltTemplate,
   ProviderSchema,
   ProviderSummary,
   SavedTemplate,
@@ -169,10 +170,29 @@ export const shareApi = {
   },
 }
 
+// ─── Prebuilt API ─────────────────────────────────────────────────────────────
+
+export const prebuiltApi = {
+  /** List all prebuilts, optionally filtered by providerId. No auth required. */
+  list: (providerId?: string): Promise<PrebuiltTemplate[]> => {
+    const query = providerId ? `?providerId=${encodeURIComponent(providerId)}` : ''
+    // Fetch without auth header — prebuilts are public
+    return fetch(`${BASE}/prebuilts${query}`)
+      .then(r => r.ok ? r.json() : Promise.reject(new Error(`${r.status}`)))
+  },
+
+  /**
+   * Fork a prebuilt into the user's personal library.
+   * Returns the newly created SavedTemplate.
+   * Requires authentication — returns 401 if not signed in.
+   */
+  fork: (id: string): Promise<SavedTemplate> =>
+    request(`/prebuilts/${id}/fork`, { method: 'POST' }),
+}
+
 // ─── AI API ───────────────────────────────────────────────────────────────────
 
 export const aiApi = {
-  /** Generate field suggestions from a natural language description. */
   suggest: (providerId: string, description: string): Promise<{ suggestions: AiSuggestions; provider: string | null }> =>
     request(`/ai/suggest/${providerId}`, {
       method: 'POST',
@@ -180,11 +200,9 @@ export const aiApi = {
       body: JSON.stringify({ description }),
     }),
 
-  /** Get current AI settings. Never returns the raw API key — only hasApiKey flag. */
   getSettings: (): Promise<AiSettings> =>
     request('/ai/settings'),
 
-  /** Save AI provider + API key. */
   saveSettings: (aiProvider: string, apiKey: string, model?: string): Promise<AiSettings> =>
     request('/ai/settings', {
       method: 'PUT',
@@ -192,11 +210,9 @@ export const aiApi = {
       body: JSON.stringify({ aiProvider, apiKey, model: model ?? null }),
     }),
 
-  /** Remove AI configuration. */
   deleteSettings: (): Promise<void> =>
     request('/ai/settings', { method: 'DELETE' }),
 
-  /** List available AI provider names for the dropdown. */
   listProviders: (): Promise<string[]> =>
     request('/ai/providers'),
 }
