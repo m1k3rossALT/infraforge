@@ -20,7 +20,7 @@ export interface Section {
   repeatable: boolean
   maxInstances: number
   fields: Field[]
-  aiHint?: string  // natural language description of what this section configures
+  aiHint?: string
 }
 
 export interface ProviderSchema {
@@ -45,7 +45,7 @@ export interface SectionState {
 
 export type FormState = Record<string, SectionState>
 
-// ─── Template management types ───────────────────────────────────────────────
+// ─── Template types ───────────────────────────────────────────────────────────
 
 export interface TemplateSummary {
   id: string
@@ -69,7 +69,22 @@ export interface SavedTemplate {
   shareToken?: string
 }
 
-// ─── Shared view type ────────────────────────────────────────────────────────
+// ─── Prebuilt template types ──────────────────────────────────────────────────
+
+/**
+ * A curated read-only template loaded from the backend's resources/prebuilts/*.json.
+ * Users can fork a prebuilt into their personal library via the Fork button.
+ */
+export interface PrebuiltTemplate {
+  id: string
+  name: string
+  description?: string
+  providerId: string
+  tags?: string[]
+  formState: FormState
+}
+
+// ─── Shared view type ─────────────────────────────────────────────────────────
 
 export interface SharedTemplate {
   name: string
@@ -77,7 +92,7 @@ export interface SharedTemplate {
   generatedCode: string
 }
 
-// ─── AI types ────────────────────────────────────────────────────────────────
+// ─── AI types ─────────────────────────────────────────────────────────────────
 
 export interface AiSettings {
   aiProvider: string | null
@@ -85,5 +100,4 @@ export interface AiSettings {
   aiModel: string | null
 }
 
-/** Nested suggestions from POST /api/v1/ai/suggest/{providerId} */
 export type AiSuggestions = Record<string, Record<string, string>>

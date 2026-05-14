@@ -1,0 +1,62 @@
+{
+  "id": "k8s-autoscaling-api",
+  "name": "Auto-scaling API",
+  "description": "Deployment + Service + HPA. Scales from 2 to 10 replicas based on CPU utilisation. Ideal for APIs with variable traffic.",
+  "providerId": "kubernetes",
+  "tags": ["api", "hpa", "autoscaling", "production"],
+  "formState": {
+    "namespace":               { "enabled": false, "instances": [{}] },
+    "service_account":         { "enabled": false, "instances": [{}] },
+    "configmap":               { "enabled": false, "instances": [{}] },
+    "secret":                  { "enabled": false, "instances": [{}] },
+    "persistent_volume_claim": { "enabled": false, "instances": [{}] },
+    "deployment": {
+      "enabled": true,
+      "instances": [{
+        "app_name": "api-server",
+        "namespace": "default",
+        "replicas": "2",
+        "image": "my-api:latest",
+        "container_port": "8080",
+        "cpu_request": "200m",
+        "cpu_limit": "1000m",
+        "memory_request": "256Mi",
+        "memory_limit": "1Gi",
+        "liveness_path": "/actuator/health",
+        "liveness_port": "8080",
+        "readiness_path": "/actuator/health/readiness",
+        "readiness_port": "8080",
+        "restart_policy": "Always",
+        "image_pull_policy": "IfNotPresent",
+        "update_strategy": "RollingUpdate",
+        "max_surge": "1",
+        "max_unavailable": "0"
+      }]
+    },
+    "service": {
+      "enabled": true,
+      "instances": [{
+        "svc_name": "api-server-svc",
+        "svc_namespace": "default",
+        "svc_type": "ClusterIP",
+        "svc_port": "80",
+        "svc_target_port": "8080",
+        "svc_selector_app": "api-server",
+        "svc_session_affinity": "None"
+      }]
+    },
+    "ingress": { "enabled": false, "instances": [{}] },
+    "hpa": {
+      "enabled": true,
+      "instances": [{
+        "hpa_name": "api-server-hpa",
+        "hpa_namespace": "default",
+        "hpa_target_name": "api-server",
+        "hpa_min_replicas": "2",
+        "hpa_max_replicas": "10",
+        "hpa_cpu_target": "70",
+        "hpa_memory_target": ""
+      }]
+    }
+  }
+}

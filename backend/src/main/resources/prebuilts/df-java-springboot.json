@@ -1,0 +1,82 @@
+{
+  "id": "df-java-springboot",
+  "name": "Java Spring Boot image",
+  "description": "Multi-stage Dockerfile for a Spring Boot application. Maven build stage compiles the JAR. Minimal JRE alpine runtime image with a non-root user keeps the final image under 200MB.",
+  "providerId": "dockerfile",
+  "tags": ["java", "spring", "springboot", "maven", "multistage"],
+  "formState": {
+    "base": {
+      "enabled": true,
+      "instances": [{
+        "base_image": "eclipse-temurin:21-jdk-alpine",
+        "use_build_stage": "true",
+        "build_stage_image": "maven:3.9-eclipse-temurin-21-alpine",
+        "runtime_stage_image": "eclipse-temurin:21-jre-alpine"
+      }]
+    },
+    "workdir": {
+      "enabled": true,
+      "instances": [{ "workdir_path": "/app" }]
+    },
+    "labels": {
+      "enabled": true,
+      "instances": [{
+        "label_maintainer": "team@example.com",
+        "label_version": "1.0.0",
+        "label_description": "Spring Boot application"
+      }]
+    },
+    "env_vars": {
+      "enabled": true,
+      "instances": [
+        { "env_key": "SPRING_PROFILES_ACTIVE", "env_value": "prod" },
+        { "env_key": "SERVER_PORT", "env_value": "8080" }
+      ]
+    },
+    "copy_deps": {
+      "enabled": true,
+      "instances": [{ "dep_files": "pom.xml" }]
+    },
+    "install_deps": {
+      "enabled": true,
+      "instances": [{ "install_cmd": "mvn dependency:resolve -q" }]
+    },
+    "copy_source": {
+      "enabled": true,
+      "instances": [{ "copy_src": "src", "copy_dest": "src" }]
+    },
+    "build_cmd": {
+      "enabled": true,
+      "instances": [{ "build_command": "mvn package -DskipTests -q" }]
+    },
+    "run_commands": {
+      "enabled": false,
+      "instances": [{ "run_cmd": "" }]
+    },
+    "expose": {
+      "enabled": true,
+      "instances": [{ "expose_port": "8080", "expose_protocol": "tcp" }]
+    },
+    "user": {
+      "enabled": true,
+      "instances": [{ "user_name": "appuser", "user_uid": "1001" }]
+    },
+    "healthcheck": {
+      "enabled": true,
+      "instances": [{
+        "healthcheck_cmd": "curl -f http://localhost:8080/actuator/health || exit 1",
+        "healthcheck_interval": "30s",
+        "healthcheck_timeout": "10s",
+        "healthcheck_retries": "3"
+      }]
+    },
+    "entrypoint": {
+      "enabled": true,
+      "instances": [{
+        "entrypoint_type": "ENTRYPOINT + CMD",
+        "entrypoint_cmd": "java",
+        "cmd_args": "-jar /app/target/app.jar"
+      }]
+    }
+  }
+}
