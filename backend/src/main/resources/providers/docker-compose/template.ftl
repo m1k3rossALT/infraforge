@@ -6,17 +6,9 @@
 <#if data?has_content>
 <#list data?split("\n") as item>
 <#if item?trim?has_content>
-${" "?left_pad(indent)}- ${item?trim}
+<#assign spaces><#list 1..indent as i> </#list></#assign>
+${spaces}- ${item?trim}
 </#if>
-</#list>
-</#if>
-</#macro>
-<#-- Helper: parse KEY=VALUE textarea into YAML env entries -->
-<#macro envEntries data indent>
-<#if data?has_content>
-<#list data?split("\n") as line>
-<#if line?trim?has_content>
-${" "?left_pad(indent)}- ${line?trim}
 </#list>
 </#if>
 </#macro>
@@ -61,9 +53,8 @@ services:
     ports:
 <@yamlListItems data=svc.svc_ports indent=6 />
 </#if>
-<#if svc.svc_env_vars?has_content || svc.svc_env_file?has_content>
-    environment:
 <#if svc.svc_env_vars?has_content>
+    environment:
 <#list svc.svc_env_vars?split("\n") as ev>
 <#if ev?trim?has_content>
       - ${ev?trim}
@@ -73,7 +64,6 @@ services:
 <#if svc.svc_env_file?has_content>
     env_file:
       - ${svc.svc_env_file}
-</#if>
 </#if>
 <#if svc.svc_volumes?has_content>
     volumes:

@@ -12,11 +12,13 @@ FROM ${base.build_stage_image!"node:20-alpine"} AS builder
 WORKDIR ${wd.workdir_path!"/app"}
 <#if s.labels?? && s.labels.enabled>
 <#assign lbl = s.labels.instances[0]>
+
 LABEL maintainer="${lbl.label_maintainer!""}" \
       version="${lbl.label_version!""}" \
       description="${lbl.label_description!""}"
 </#if>
 <#if s.env_vars?? && s.env_vars.enabled>
+
 <#list s.env_vars.instances as ev>
 <#if ev.env_key?has_content>
 ENV ${ev.env_key}="${ev.env_value!""}"
@@ -26,19 +28,23 @@ ENV ${ev.env_key}="${ev.env_value!""}"
 <#if s.copy_deps?? && s.copy_deps.enabled>
 <#assign cd = s.copy_deps.instances[0]>
 <#if cd.dep_files?has_content>
+
 COPY <#list cd.dep_files?split("\n") as f><#if f?trim?has_content>${f?trim} </#if></#list>./
 </#if>
 </#if>
 <#if s.install_deps?? && s.install_deps.enabled>
-<#assign id = s.install_deps.instances[0]>
-RUN ${id.install_cmd!"npm ci"}
+<#assign id_sec = s.install_deps.instances[0]>
+
+RUN ${id_sec.install_cmd!"npm ci"}
 </#if>
 <#if s.copy_source?? && s.copy_source.enabled>
 <#assign cs = s.copy_source.instances[0]>
+
 COPY ${cs.copy_src!"."} ${cs.copy_dest!"."}
 </#if>
 <#if s.build_cmd?? && s.build_cmd.enabled>
 <#assign bc = s.build_cmd.instances[0]>
+
 RUN ${bc.build_command!"npm run build"}
 </#if>
 
@@ -89,9 +95,9 @@ COPY <#list cd.dep_files?split("\n") as f><#if f?trim?has_content>${f?trim} </#i
 </#if>
 </#if>
 <#if s.install_deps?? && s.install_deps.enabled>
-<#assign id = s.install_deps.instances[0]>
+<#assign id_sec = s.install_deps.instances[0]>
 
-RUN ${id.install_cmd!"npm ci --only=production"}
+RUN ${id_sec.install_cmd!"npm ci --only=production"}
 </#if>
 <#if s.copy_source?? && s.copy_source.enabled>
 <#assign cs = s.copy_source.instances[0]>
@@ -141,11 +147,14 @@ HEALTHCHECK --interval=${hc.healthcheck_interval!"30s"} \
 <#-- Entrypoint & CMD                                             -->
 <#-- ============================================================ -->
 
-<#if (ep.entrypoint_type!"CMD only") == "ENTRYPOINT + CMD">
-ENTRYPOINT ["${ep.entrypoint_cmd!"node"}"]
-CMD ["${ep.cmd_args!"server.js"}"]
-<#elseif (ep.entrypoint_type!"CMD only") == "ENTRYPOINT only">
-ENTRYPOINT ["${ep.entrypoint_cmd!"node"}", "${ep.cmd_args!"server.js"}"]
+<#assign startType = ep.entrypoint_type!"CMD only">
+<#assign entrypointExec = ep.entrypoint_cmd!"node">
+<#assign cmdArgs = ep.cmd_args!"server.js">
+<#if startType == "ENTRYPOINT + CMD">
+ENTRYPOINT ["${entrypointExec}"]
+CMD ["${cmdArgs}"]
+<#elseif startType == "ENTRYPOINT only">
+ENTRYPOINT ["${entrypointExec}", "${cmdArgs}"]
 <#else>
-CMD ["${ep.cmd_args!"node", "server.js"}"]
+CMD ["${cmdArgs}"]
 </#if>
