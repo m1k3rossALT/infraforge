@@ -37,7 +37,7 @@ infraforge:
     # Override via INFRAFORGE_AI_ENCRYPTION_KEY in production.
     # IMPORTANT: changing this key invalidates all stored encrypted API keys —
     # users will need to re-enter their keys. Rotate carefully.
-    encryption-key: ${INFRAFORGE_AI_ENCRYPTION_KEY:dev-ai-enc-key-change-in-prod!!!!}
+    encryption-key: ${INFRAFORGE_AI_ENCRYPTION_KEY:dev-ai-enc-key-change-in-prod!!!}
     # Rate limit: max suggest requests per user per minute
     rate-limit-per-minute: ${INFRAFORGE_AI_RATE_LIMIT:10}
 

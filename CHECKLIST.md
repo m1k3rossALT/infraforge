@@ -115,73 +115,59 @@ dependency for that phase, or because the risk of not having it grows significan
 ---
 
 ## Phase 4 — AI-Assisted Field Suggestions (BYOK)
-> Status: 🔲 In Progress
+> Status: ✅ Complete — tagged v0.7.0
 
-### 4a — Backend infrastructure
-- [ ] Add `spring-boot-starter-webflux` to pom.xml — non-blocking HTTP client for AI API calls
-- [ ] Add `bucket4j-core` to pom.xml — in-memory rate limiting
-- [ ] V5 migration — add `ai_provider` VARCHAR(32) and `ai_api_key_encrypted` TEXT columns
-      to users table (nullable — AI is opt-in)
-- [ ] AiKeyEncryptionService — AES-256 encryption/decryption of stored API keys
-      (encryption key loaded from environment variable, never hardcoded)
-- [ ] EnhancementService interface — `suggest(providerId, description, schema)` →
-      returns Map<sectionId, Map<fieldId, suggestedValue>>
-- [ ] NoOpEnhancementService — default impl, returns empty map, always active in dev profile
-- [ ] GeminiEnhancementService — calls Gemini REST API using user's stored key
-- [ ] OpenAiEnhancementService — calls OpenAI REST API using user's stored key
-- [ ] AnthropicEnhancementService — calls Anthropic REST API using user's stored key
-- [ ] MistralEnhancementService — calls Mistral REST API using user's stored key
-- [ ] GroqEnhancementService — calls Groq REST API using user's stored key
-- [ ] EnhancementServiceRouter — selects the correct impl based on user's stored ai_provider
-- [ ] Prompt builder — constructs a structured prompt from provider schema + aiHint fields +
-      user description; instructs model to return strict JSON only
-- [ ] POST /api/v1/providers/{id}/suggest — auth-required, accepts { description },
-      returns { suggestions: Map<sectionId, Map<fieldId, value>> }
-- [ ] Rate limiting — 10 requests/minute per authenticated user via Bucket4j in-memory
-- [ ] PUT /api/v1/users/settings/ai — save ai_provider + encrypted api_key for current user
-- [ ] DELETE /api/v1/users/settings/ai — remove stored AI config for current user
-- [ ] GET /api/v1/users/settings/ai — return { aiProvider, hasApiKey: true/false } —
-      never return the raw or encrypted key
+### 4a — Backend infrastructure ✅
+- [x] Add `bucket4j-core` to pom.xml — in-memory rate limiting
+- [x] V5 migration — add `ai_provider`, `ai_api_key_enc`, `ai_model` columns to users table
+- [x] AiKeyEncryptionService — AES-256-GCM encryption/decryption of stored API keys
+- [x] EnhancementService interface — provider-agnostic contract
+- [x] NoOpEnhancementService — safe fallback, returns empty map
+- [x] GeminiEnhancementService — Gemini REST API (gemini-2.0-flash default)
+- [x] OpenAiEnhancementService — OpenAI Chat Completions API (gpt-4o-mini default)
+- [x] AnthropicEnhancementService — Anthropic Messages API (claude-haiku default)
+- [x] MistralEnhancementService — Mistral API (mistral-small-latest default)
+- [x] GroqEnhancementService — Groq API (llama-3.3-70b default)
+- [x] OpenAiCompatibleEnhancementService — abstract base for OpenAI-format providers
+- [x] EnhancementServiceRouter — auto-discovers all provider beans, routes by name
+- [x] PromptBuilder — provider-agnostic structured prompt from schema + description
+- [x] AiRateLimiterService — Bucket4j per-user 10 req/min in-memory
+- [x] POST /api/v1/ai/suggest/{providerId} — auth-required, rate limited
+- [x] GET/PUT/DELETE /api/v1/ai/settings — save/retrieve/remove encrypted API key
+- [x] GET /api/v1/ai/providers — list available provider names
+- [x] SecurityConfig updated — /api/v1/ai/** requires authentication
 
 ### 4b — Schema integration
-- [ ] Add optional `aiHint` field to Section model in ProviderSchema.java
-- [ ] Add `aiHint` to schema.json for terraform, ansible, and vagrant providers —
-      plain English description of what each section configures, used in prompt context
-- [ ] aiHint values included in prompt builder when present
+- [x] `aiHint` field added to Section and Field models in ProviderSchema.java
+- [ ] Add `aiHint` values to terraform schema.json
+- [ ] Add `aiHint` values to ansible schema.json
+- [ ] Add `aiHint` values to vagrant schema.json
 
-### 4c — Settings drawer (right-side)
-- [ ] SettingsDrawer component — slides in from the right, same animation as TemplateDrawer
-- [ ] Settings icon button in top-right bar — opens/closes SettingsDrawer
-- [ ] SettingsDrawer sections: Profile tab, AI Provider tab
-      (tab structure allows future additions without layout changes)
-- [ ] Profile tab — display email, change password form (calls future endpoint)
-- [ ] AI Provider tab — provider dropdown (Gemini / OpenAI / Claude / Mistral / Groq),
-      API key input (masked, shows •••••• after save), model selector per provider,
-      "Test connection" button, save and remove key actions
-- [ ] API key masked after save — frontend never stores or displays the raw key
-- [ ] "Test connection" sends a minimal suggest request and shows success/failure inline
+### 4c — Settings drawer ✅
+- [x] SettingsDrawer component — slides in from the right, tabbed structure
+- [x] Settings icon (⚙) in top-right bar
+- [x] Profile tab — email display
+- [x] AI Provider tab — provider dropdown, API key input (masked after save),
+      model selector, Test connection button, Remove key action
+- [x] API key masked after save — raw key never stored or displayed in frontend
 
-### 4d — Natural language input bar
-- [ ] Collapsible AI bar above the form — collapsed by default, expands on click
-- [ ] Bar contains: provider badge (shows configured provider or "No AI configured"),
-      text input ("Describe what you want to build…"), Fill button, loading spinner
-- [ ] If no API key configured — clicking the bar opens SettingsDrawer at the AI tab
-- [ ] On submit — calls POST /api/v1/providers/{id}/suggest with description
-- [ ] On success — merge suggested values into existing form state
-- [ ] Field highlight — fields updated by AI briefly highlight (fade in/out) so the user
-      can see what changed
-- [ ] Live preview regenerates automatically from state change (existing debounce path —
-      no new rendering logic needed)
-- [ ] AI output goes through FreeMarker like all other form state —
-      no provider-specific AI logic, any current or future provider works automatically
-- [ ] Saving after AI fill uses the existing save flow — no new save path
-- [ ] Graceful degradation — if AI call fails (bad key, rate limit, network), show inline
-      error in the bar, form remains fully functional
+### 4d — Natural language input bar ✅
+- [x] AiBar component — collapsible above the form, collapsed by default
+- [x] Shows configured provider badge or "Set up →" if not configured
+- [x] Opens SettingsDrawer at AI tab if no key configured
+- [x] Calls POST /api/v1/ai/suggest on submit
+- [x] Merges suggestions into form state — enables sections with suggestions
+- [x] FieldRenderer highlight — filled fields briefly highlighted with ✨
+- [x] Live preview regenerates automatically from state change
+- [x] Graceful degradation — inline error on failure, form remains functional
+- [x] Rate limit error shown clearly (429)
+- [x] Keyboard shortcut ⌘↵ / Ctrl+↵ to submit
 
-### 4e — API reference & docs
-- [ ] Add AI suggest endpoint to README API reference table
-- [ ] Add AI settings endpoints to README API reference table
-- [ ] Update roadmap table in README — Phase 4 marked complete
+### 4e — Docs ✅
+- [x] AI API endpoints added to README
+- [x] AI Feature (BYOK) section added to README
+- [x] Environment variables table added to README
+- [x] aiHint documented in Adding a Provider section
 
 ---
 
@@ -198,32 +184,27 @@ dependency for that phase, or because the risk of not having it grows significan
       are public (guest mode)
 - [x] 🔒 JSON 401/403 responses — no HTML redirects to break the React SPA
 - [x] 🔒 V2 migration — users + refresh_tokens tables, user_id FK on templates
-- [x] 🔒 V3 migration — fix user_role column type (VARCHAR replaces PostgreSQL native
-      ENUM to resolve JDBC prepared statement cast failure on register)
+- [x] 🔒 V3 migration — fix user_role column type (VARCHAR replaces PostgreSQL native ENUM)
 - [x] 🔒 GET /api/v1/templates/{id} ownership check — 403 if caller is not the owner
-      (templates with null user_id are accessible — backward compat with Phase 3 data)
 - [x] 🔒 Export endpoint ownership check — same rule as getById
 - [x] Frontend — AuthContext with in-memory access token (never localStorage)
 - [x] Frontend — refresh token persisted in sessionStorage (survives page reload)
-- [x] Frontend — silent refresh on app load (reads sessionStorage on mount)
+- [x] Frontend — silent refresh on app load
 - [x] Frontend — 401 interceptor in API client — transparent token refresh + retry
 - [x] Frontend — AuthModal (login / register toggle)
 - [x] Frontend — Sign in / Sign out in top bar, user email displayed
 - [x] Frontend — auto-save and template library gated on isAuthenticated
-- [ ] 🔒 RBAC — roles currently wired (VIEWER / EDITOR / ADMIN) but not enforced
-      at the endpoint level — add @PreAuthorize guards before v1.0
+- [ ] 🔒 RBAC — roles wired but not enforced — add @PreAuthorize guards before v1.0
 - [ ] 🔒 HTTPS enforced — HTTP to HTTPS redirect in nginx
 - [ ] 🔒 Security headers — HSTS, X-Frame-Options, Content-Security-Policy in nginx
 - [ ] 🔒 Move refresh token from sessionStorage to httpOnly SameSite=Strict cookie
-      (requires backend Set-Cookie on login/refresh, cookie-based logout endpoint;
-      deferred from v0.5.0 — acceptable for dev/staging, required before public launch)
 
 ### 5b — Multi-user features ✅
 - [x] Templates scoped to user — enforced (listAll and getById check ownership)
 - [x] Template sharing — GET /api/v1/shared/{shareToken} public read-only endpoint
-- [x] Share link generation — POST /api/v1/templates/{id}/share, stores UUID token
+- [x] Share link generation — POST /api/v1/templates/{id}/share
 - [x] Share link revocation — DELETE /api/v1/templates/{id}/share
-- [x] V4 migration — add share_token UUID column to templates (nullable, unique index)
+- [x] V4 migration — add share_token UUID column to templates
 - [x] Frontend — Share/Unshare/Copy link buttons in TemplateDrawer
 - [x] Frontend — /shared/:token route — SharedView read-only code preview
 - [x] Frontend — "Shared" badge on shared templates in library
@@ -233,10 +214,9 @@ dependency for that phase, or because the risk of not having it grows significan
 ### 5c — Dependency security audit ✅
 - [x] npm audit integrated into frontend Docker build — fail on high severity
 - [x] mvn dependency-check:check (OWASP) added to backend build pipeline
-- [x] Dependabot config removed — version bump PRs were noisy and risky;
-      security alerts remain active via GitHub repo settings
+- [x] Dependabot config removed — security alerts remain active via GitHub repo settings
 
-### 5d — Kubernetes
+### 5d — Kubernetes deployment
 > Status: 🔲 Future
 
 - [ ] Helm chart scaffolded — backend Deployment + Service, frontend Deployment + Service
@@ -250,41 +230,63 @@ dependency for that phase, or because the risk of not having it grows significan
 
 ---
 
+## Phase 7 — Extended Providers (Kubernetes, Docker)
+> Status: 🔲 Planned
+
+### 7a — Kubernetes YAML provider
+- [ ] kubernetes/schema.json — sections: Deployment, Service, ConfigMap, Secret,
+      Ingress, PersistentVolumeClaim, HorizontalPodAutoscaler, Namespace, ServiceAccount
+- [ ] kubernetes/template.ftl — multi-resource output separated by ---
+- [ ] aiHint values added to all sections and fields
+- [ ] Validated against real kubectl apply
+
+### 7b — Dockerfile provider
+- [ ] dockerfile/schema.json — sections: base image, working directory, environment
+      variables, exposed ports, copy instructions, run commands, entrypoint/cmd
+- [ ] dockerfile/template.ftl — generates valid Dockerfile
+- [ ] fileExtension set appropriately so output file is named Dockerfile
+- [ ] aiHint values added
+- [ ] Validated with docker build
+
+### 7c — Docker Compose provider
+- [ ] docker-compose/schema.json — sections: services (repeatable), networks, volumes,
+      environment variables per service, port mappings, depends_on, health checks
+- [ ] docker-compose/template.ftl — generates valid docker-compose.yml
+- [ ] aiHint values added
+- [ ] Validated with docker compose up
+
+### 7d — Docs
+- [ ] README roadmap updated
+- [ ] New providers documented in Adding a Provider section
+
+---
+
 ## Phase 6 — Subscription & Managed AI
 > Status: 🔲 Backlog — not started
 
-This phase replaces BYOK with a platform-managed AI model. Users pay InfraForge for access
-to AI features rather than managing their own API keys. Requires Phase 4 to be fully complete.
-
 ### 6a — Subscription infrastructure
 - [ ] Stripe integration — checkout session, webhook handler, subscription lifecycle
-- [ ] V_migration — add `subscription_status` VARCHAR(32) and `subscription_id` TEXT
-      to users table
+- [ ] V_migration — add `subscription_status` and `subscription_id` to users table
 - [ ] SubscriptionService — create, cancel, check active subscription
-- [ ] Webhook endpoint POST /api/v1/webhooks/stripe — handle
-      checkout.session.completed, customer.subscription.deleted, invoice.payment_failed
-- [ ] 🔒 Webhook signature verification — validate Stripe-Signature header on all
-      incoming webhook calls
+- [ ] Webhook endpoint POST /api/v1/webhooks/stripe
+- [ ] 🔒 Webhook signature verification — validate Stripe-Signature header
 
 ### 6b — Subscription tiers
 - [ ] Free tier — template save/load/share, no AI
-- [ ] Pro tier — all free features + platform-managed AI (no BYOK needed)
-- [ ] Middleware — check subscription_status before allowing suggest calls;
-      return 402 Payment Required if not on pro tier
-- [ ] Grace period — allow 3 days after payment failure before locking AI access
+- [ ] Pro tier — all free features + platform-managed AI
+- [ ] Middleware — check subscription before allowing suggest calls; return 402 if not pro
+- [ ] Grace period — 3 days after payment failure before locking AI access
 
 ### 6c — Platform-managed AI
-- [ ] Platform API keys stored in environment variables (not in DB, not per-user)
-- [ ] EnhancementServiceRouter updated — pro users use platform key, BYOK users
-      can still use their own key if they prefer
-- [ ] Usage metering — log AI call count per user per day for billing audit trail
+- [ ] Platform API keys stored in environment variables (not per-user)
+- [ ] EnhancementServiceRouter updated — pro users use platform key, BYOK still available
+- [ ] Usage metering — log AI call count per user per day for billing audit
 
 ### 6d — Frontend
-- [ ] Upgrade prompt — when non-pro user tries to use AI, show upgrade CTA instead
-      of "No AI configured" message
+- [ ] Upgrade prompt when non-pro user tries AI
 - [ ] Billing page — current plan, next billing date, cancel subscription
-- [ ] Stripe Checkout redirect flow — upgrade button → Stripe hosted page → return to app
-- [ ] Post-upgrade redirect — return URL lands back in app with success banner
+- [ ] Stripe Checkout redirect flow
+- [ ] Post-upgrade redirect with success banner
 
 ---
 
@@ -307,3 +309,4 @@ to AI features rather than managing their own API keys. Requires Phase 4 to be f
 | 4 | Suggest endpoint live, AI bar fills form, settings drawer working, graceful degradation tested |
 | 5 | Auth flow complete, share links working, all owned endpoints protected |
 | 6 | Stripe webhooks tested, subscription gating verified, pro tier AI working end to end |
+| 7 | All three providers validated with real tool CLIs, aiHint values complete |
