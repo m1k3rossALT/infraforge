@@ -1,61 +1,103 @@
 {
   "id": "k8s-stateful-service",
-  "name": "Stateful service with storage",
+  "name": "[K8s] Stateful service with storage",
   "description": "Deployment with a PersistentVolumeClaim for durable storage. Suitable for databases and other stateful workloads. Includes a headless ClusterIP service.",
   "providerId": "kubernetes",
-  "tags": ["stateful", "database", "pvc", "storage"],
+  "tags": [
+    "kubernetes",
+    "database",
+    "stateful",
+    "pvc",
+    "production"
+  ],
   "formState": {
-    "namespace":       { "enabled": false, "instances": [{}] },
-    "service_account": { "enabled": false, "instances": [{}] },
-    "configmap":       { "enabled": false, "instances": [{}] },
-    "secret":          { "enabled": false, "instances": [{}] },
+    "namespace": {
+      "enabled": false,
+      "instances": [
+        {}
+      ]
+    },
+    "service_account": {
+      "enabled": false,
+      "instances": [
+        {}
+      ]
+    },
+    "configmap": {
+      "enabled": false,
+      "instances": [
+        {}
+      ]
+    },
+    "secret": {
+      "enabled": false,
+      "instances": [
+        {}
+      ]
+    },
     "persistent_volume_claim": {
       "enabled": true,
-      "instances": [{
-        "pvc_name": "db-data",
-        "pvc_namespace": "default",
-        "pvc_storage_class": "",
-        "pvc_access_mode": "ReadWriteOnce",
-        "pvc_storage_size": "20Gi"
-      }]
+      "instances": [
+        {
+          "pvc_name": "db-data",
+          "pvc_namespace": "default",
+          "pvc_storage_class": "",
+          "pvc_access_mode": "ReadWriteOnce",
+          "pvc_storage_size": "20Gi"
+        }
+      ]
     },
     "deployment": {
       "enabled": true,
-      "instances": [{
-        "app_name": "postgres",
-        "namespace": "default",
-        "replicas": "1",
-        "image": "postgres:16-alpine",
-        "container_port": "5432",
-        "cpu_request": "250m",
-        "cpu_limit": "1000m",
-        "memory_request": "256Mi",
-        "memory_limit": "1Gi",
-        "env_secret_ref": "postgres-secret",
-        "volume_mount_name": "db-data",
-        "volume_mount_path": "/var/lib/postgresql/data",
-        "liveness_path": "",
-        "readiness_path": "",
-        "restart_policy": "Always",
-        "image_pull_policy": "IfNotPresent",
-        "update_strategy": "Recreate",
-        "max_surge": "1",
-        "max_unavailable": "0"
-      }]
+      "instances": [
+        {
+          "app_name": "postgres",
+          "namespace": "default",
+          "replicas": "1",
+          "image": "postgres:16-alpine",
+          "container_port": "5432",
+          "cpu_request": "250m",
+          "cpu_limit": "1000m",
+          "memory_request": "256Mi",
+          "memory_limit": "1Gi",
+          "env_secret_ref": "postgres-secret",
+          "volume_mount_name": "db-data",
+          "volume_mount_path": "/var/lib/postgresql/data",
+          "liveness_path": "",
+          "readiness_path": "",
+          "restart_policy": "Always",
+          "image_pull_policy": "IfNotPresent",
+          "update_strategy": "Recreate",
+          "max_surge": "1",
+          "max_unavailable": "0"
+        }
+      ]
     },
     "service": {
       "enabled": true,
-      "instances": [{
-        "svc_name": "postgres-svc",
-        "svc_namespace": "default",
-        "svc_type": "ClusterIP",
-        "svc_port": "5432",
-        "svc_target_port": "5432",
-        "svc_selector_app": "postgres",
-        "svc_session_affinity": "None"
-      }]
+      "instances": [
+        {
+          "svc_name": "postgres-svc",
+          "svc_namespace": "default",
+          "svc_type": "ClusterIP",
+          "svc_port": "5432",
+          "svc_target_port": "5432",
+          "svc_selector_app": "postgres",
+          "svc_session_affinity": "None"
+        }
+      ]
     },
-    "ingress": { "enabled": false, "instances": [{}] },
-    "hpa":     { "enabled": false, "instances": [{}] }
+    "ingress": {
+      "enabled": false,
+      "instances": [
+        {}
+      ]
+    },
+    "hpa": {
+      "enabled": false,
+      "instances": [
+        {}
+      ]
+    }
   }
 }

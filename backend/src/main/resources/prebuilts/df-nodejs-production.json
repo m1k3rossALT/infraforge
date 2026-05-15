@@ -1,82 +1,137 @@
 {
   "id": "df-nodejs-production",
-  "name": "Node.js production image",
+  "name": "[Dockerfile] Node.js production image",
   "description": "Multi-stage Dockerfile for a Node.js application. Builder stage installs all dependencies and compiles. Runtime stage uses a minimal alpine image with only production dependencies and a non-root user.",
   "providerId": "dockerfile",
-  "tags": ["node", "nodejs", "multistage", "production", "alpine"],
+  "tags": [
+    "dockerfile",
+    "nodejs",
+    "multistage",
+    "production",
+    "alpine"
+  ],
   "formState": {
     "base": {
       "enabled": true,
-      "instances": [{
-        "base_image": "node:20-alpine",
-        "use_build_stage": "true",
-        "build_stage_image": "node:20-alpine",
-        "runtime_stage_image": "node:20-alpine"
-      }]
+      "instances": [
+        {
+          "base_image": "node:20-alpine",
+          "use_build_stage": "true",
+          "build_stage_image": "node:20-alpine",
+          "runtime_stage_image": "node:20-alpine"
+        }
+      ]
     },
     "workdir": {
       "enabled": true,
-      "instances": [{ "workdir_path": "/app" }]
+      "instances": [
+        {
+          "workdir_path": "/app"
+        }
+      ]
     },
     "labels": {
       "enabled": true,
-      "instances": [{
-        "label_maintainer": "team@example.com",
-        "label_version": "1.0.0",
-        "label_description": "Node.js production image"
-      }]
+      "instances": [
+        {
+          "label_maintainer": "team@example.com",
+          "label_version": "1.0.0",
+          "label_description": "Node.js production image"
+        }
+      ]
     },
     "env_vars": {
       "enabled": true,
       "instances": [
-        { "env_key": "NODE_ENV", "env_value": "production" },
-        { "env_key": "PORT", "env_value": "3000" }
+        {
+          "env_key": "NODE_ENV",
+          "env_value": "production"
+        },
+        {
+          "env_key": "PORT",
+          "env_value": "3000"
+        }
       ]
     },
     "copy_deps": {
       "enabled": true,
-      "instances": [{ "dep_files": "package.json\npackage-lock.json" }]
+      "instances": [
+        {
+          "dep_files": "package.json\npackage-lock.json"
+        }
+      ]
     },
     "install_deps": {
       "enabled": true,
-      "instances": [{ "install_cmd": "npm ci --only=production" }]
+      "instances": [
+        {
+          "install_cmd": "npm ci --only=production"
+        }
+      ]
     },
     "copy_source": {
       "enabled": true,
-      "instances": [{ "copy_src": ".", "copy_dest": "." }]
+      "instances": [
+        {
+          "copy_src": ".",
+          "copy_dest": "."
+        }
+      ]
     },
     "build_cmd": {
       "enabled": false,
-      "instances": [{ "build_command": "npm run build" }]
+      "instances": [
+        {
+          "build_command": "npm run build"
+        }
+      ]
     },
     "run_commands": {
       "enabled": false,
-      "instances": [{ "run_cmd": "" }]
+      "instances": [
+        {
+          "run_cmd": ""
+        }
+      ]
     },
     "expose": {
       "enabled": true,
-      "instances": [{ "expose_port": "3000", "expose_protocol": "tcp" }]
+      "instances": [
+        {
+          "expose_port": "3000",
+          "expose_protocol": "tcp"
+        }
+      ]
     },
     "user": {
       "enabled": true,
-      "instances": [{ "user_name": "appuser", "user_uid": "1001" }]
+      "instances": [
+        {
+          "user_name": "appuser",
+          "user_uid": "1001"
+        }
+      ]
     },
     "healthcheck": {
       "enabled": true,
-      "instances": [{
-        "healthcheck_cmd": "curl -f http://localhost:3000/health || exit 1",
-        "healthcheck_interval": "30s",
-        "healthcheck_timeout": "10s",
-        "healthcheck_retries": "3"
-      }]
+      "instances": [
+        {
+          "healthcheck_cmd": "curl -f http://localhost:3000/health || exit 1",
+          "healthcheck_interval": "30s",
+          "healthcheck_timeout": "10s",
+          "healthcheck_retries": "3"
+        }
+      ]
     },
     "entrypoint": {
       "enabled": true,
-      "instances": [{
-        "entrypoint_type": "ENTRYPOINT + CMD",
-        "entrypoint_cmd": "node",
-        "cmd_args": "server.js"
-      }]
+      "instances": [
+        {
+          "entrypoint_type": "ENTRYPOINT + CMD",
+          "entrypoint_cmd": "node",
+          "cmd_args": "server.js"
+        }
+      ]
     }
   }
 }

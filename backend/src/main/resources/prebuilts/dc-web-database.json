@@ -1,16 +1,24 @@
 {
   "id": "dc-web-database",
-  "name": "Web app + PostgreSQL",
+  "name": "[Compose] Web app + PostgreSQL",
   "description": "A Node.js application service with a PostgreSQL database, named volume for data persistence, shared network, and health check on the database.",
   "providerId": "docker-compose",
-  "tags": ["web", "postgres", "database", "node"],
+  "tags": [
+    "docker-compose",
+    "web",
+    "database",
+    "postgres",
+    "production"
+  ],
   "formState": {
     "compose_meta": {
       "enabled": true,
-      "instances": [{
-        "compose_version": "3.9",
-        "project_name": "my-project"
-      }]
+      "instances": [
+        {
+          "compose_version": "3.9",
+          "project_name": "my-project"
+        }
+      ]
     },
     "service": {
       "enabled": true,
@@ -61,20 +69,24 @@
     },
     "volume": {
       "enabled": true,
-      "instances": [{
-        "vol_name": "postgres_data",
-        "vol_driver": "local",
-        "vol_external": "false"
-      }]
+      "instances": [
+        {
+          "vol_name": "postgres_data",
+          "vol_driver": "local",
+          "vol_external": "false"
+        }
+      ]
     },
     "network": {
       "enabled": true,
-      "instances": [{
-        "net_name": "app-network",
-        "net_driver": "bridge",
-        "net_external": "false",
-        "net_subnet": ""
-      }]
+      "instances": [
+        {
+          "net_name": "app-network",
+          "net_driver": "bridge",
+          "net_external": "false",
+          "net_subnet": ""
+        }
+      ]
     }
   }
 }
