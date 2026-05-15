@@ -78,22 +78,26 @@ export function TemplateDrawer({ open, onClose, onLoad, onImport, onForkPrebuilt
   ])).sort()
 
   // Filtering logic
-  const matchesSearch = (name: string, desc?: string) => {
+  const matchesSearch = (name: string, desc?: string, tags?: string[]) => {
     if (!search.trim()) return true
     const q = search.toLowerCase()
-    return name.toLowerCase().includes(q) || (desc?.toLowerCase().includes(q) ?? false)
+    return (
+      name.toLowerCase().includes(q) ||
+      (desc?.toLowerCase().includes(q) ?? false) ||
+      (tags?.some(tag => tag.toLowerCase().includes(q)) ?? false)
+    )
   }
 
   const filteredSaved = savedTemplates.filter(t => {
     if (activeFilter === 'prebuilt') return false
     if (activeFilter !== 'all' && activeFilter !== 'saved' && t.providerId !== activeFilter) return false
-    return matchesSearch(t.name, t.description)
+    return matchesSearch(t.name, t.description, t.tags)
   })
 
   const filteredPrebuilts = prebuilts.filter(t => {
     if (activeFilter === 'saved') return false
     if (activeFilter !== 'all' && activeFilter !== 'prebuilt' && t.providerId !== activeFilter) return false
-    return matchesSearch(t.name, t.description)
+    return matchesSearch(t.name, t.description, t.tags)
   })
 
   const handleLoad = async (id: string) => {

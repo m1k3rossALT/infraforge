@@ -1,78 +1,114 @@
 {
   "id": "k8s-secure-microservice",
-  "name": "Secure microservice",
+  "name": "[K8s] Secure microservice",
   "description": "Microservice with a dedicated ServiceAccount, ConfigMap for config, Secret for credentials, Deployment with non-root user pattern, and an internal Service.",
   "providerId": "kubernetes",
-  "tags": ["security", "microservice", "serviceaccount", "production"],
+  "tags": [
+    "kubernetes",
+    "microservice",
+    "security",
+    "serviceaccount",
+    "production"
+  ],
   "formState": {
-    "namespace": { "enabled": false, "instances": [{}] },
+    "namespace": {
+      "enabled": false,
+      "instances": [
+        {}
+      ]
+    },
     "service_account": {
       "enabled": true,
-      "instances": [{
-        "sa_name": "my-service-sa",
-        "sa_namespace": "default",
-        "sa_automount_token": "false",
-        "sa_annotation_key": "",
-        "sa_annotation_value": ""
-      }]
+      "instances": [
+        {
+          "sa_name": "my-service-sa",
+          "sa_namespace": "default",
+          "sa_automount_token": "false",
+          "sa_annotation_key": "",
+          "sa_annotation_value": ""
+        }
+      ]
     },
     "configmap": {
       "enabled": true,
-      "instances": [{
-        "cm_name": "my-service-config",
-        "cm_namespace": "default",
-        "cm_data": "APP_ENV=production\nLOG_LEVEL=info\nPORT=8080"
-      }]
+      "instances": [
+        {
+          "cm_name": "my-service-config",
+          "cm_namespace": "default",
+          "cm_data": "APP_ENV=production\nLOG_LEVEL=info\nPORT=8080"
+        }
+      ]
     },
     "secret": {
       "enabled": true,
-      "instances": [{
-        "secret_name": "my-service-secret",
-        "secret_namespace": "default",
-        "secret_type": "Opaque",
-        "secret_data": "DB_PASSWORD=REPLACE_WITH_BASE64\nAPI_KEY=REPLACE_WITH_BASE64"
-      }]
+      "instances": [
+        {
+          "secret_name": "my-service-secret",
+          "secret_namespace": "default",
+          "secret_type": "Opaque",
+          "secret_data": "DB_PASSWORD=REPLACE_WITH_BASE64\nAPI_KEY=REPLACE_WITH_BASE64"
+        }
+      ]
     },
-    "persistent_volume_claim": { "enabled": false, "instances": [{}] },
+    "persistent_volume_claim": {
+      "enabled": false,
+      "instances": [
+        {}
+      ]
+    },
     "deployment": {
       "enabled": true,
-      "instances": [{
-        "app_name": "my-service",
-        "namespace": "default",
-        "replicas": "2",
-        "image": "my-service:1.0.0",
-        "container_port": "8080",
-        "cpu_request": "100m",
-        "cpu_limit": "500m",
-        "memory_request": "128Mi",
-        "memory_limit": "512Mi",
-        "env_configmap_ref": "my-service-config",
-        "env_secret_ref": "my-service-secret",
-        "service_account_name": "my-service-sa",
-        "liveness_path": "/health",
-        "liveness_port": "8080",
-        "readiness_path": "/ready",
-        "readiness_port": "8080",
-        "restart_policy": "Always",
-        "image_pull_policy": "IfNotPresent",
-        "update_strategy": "RollingUpdate",
-        "max_surge": "1",
-        "max_unavailable": "0"
-      }]
+      "instances": [
+        {
+          "app_name": "my-service",
+          "namespace": "default",
+          "replicas": "2",
+          "image": "my-service:1.0.0",
+          "container_port": "8080",
+          "cpu_request": "100m",
+          "cpu_limit": "500m",
+          "memory_request": "128Mi",
+          "memory_limit": "512Mi",
+          "env_configmap_ref": "my-service-config",
+          "env_secret_ref": "my-service-secret",
+          "service_account_name": "my-service-sa",
+          "liveness_path": "/health",
+          "liveness_port": "8080",
+          "readiness_path": "/ready",
+          "readiness_port": "8080",
+          "restart_policy": "Always",
+          "image_pull_policy": "IfNotPresent",
+          "update_strategy": "RollingUpdate",
+          "max_surge": "1",
+          "max_unavailable": "0"
+        }
+      ]
     },
     "service": {
       "enabled": true,
-      "instances": [{
-        "svc_name": "my-service-svc",
-        "svc_namespace": "default",
-        "svc_type": "ClusterIP",
-        "svc_port": "80",
-        "svc_target_port": "8080",
-        "svc_selector_app": "my-service",
-        "svc_session_affinity": "None"
-      }]
+      "instances": [
+        {
+          "svc_name": "my-service-svc",
+          "svc_namespace": "default",
+          "svc_type": "ClusterIP",
+          "svc_port": "80",
+          "svc_target_port": "8080",
+          "svc_selector_app": "my-service",
+          "svc_session_affinity": "None"
+        }
+      ]
     },
-    "ingress": { "enabled": false, "instances": [{}] },
-    "hpa":     { "enabled": false, "instances": [{}] }
+    "ingress": {
+      "enabled": false,
+      "instances": [
+        {}
+      ]
+    },
+    "hpa": {
+      "enabled": false,
+      "instances": [
+        {}
+      ]
+    }
   }
 }
