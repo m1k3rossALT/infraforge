@@ -1,16 +1,25 @@
 {
   "id": "dc-fullstack",
-  "name": "Full stack — frontend, backend, database",
+  "name": "[Compose] Full stack \u2014 frontend, backend, database",
   "description": "Three-service stack: React frontend on port 80, Node.js API on port 3000, PostgreSQL database. Separate frontend and backend networks for isolation.",
   "providerId": "docker-compose",
-  "tags": ["fullstack", "react", "node", "postgres", "nginx"],
+  "tags": [
+    "docker-compose",
+    "fullstack",
+    "web",
+    "api",
+    "database",
+    "production"
+  ],
   "formState": {
     "compose_meta": {
       "enabled": true,
-      "instances": [{
-        "compose_version": "3.9",
-        "project_name": "fullstack-app"
-      }]
+      "instances": [
+        {
+          "compose_version": "3.9",
+          "project_name": "fullstack-app"
+        }
+      ]
     },
     "service": {
       "enabled": true,
@@ -82,11 +91,13 @@
     },
     "volume": {
       "enabled": true,
-      "instances": [{
-        "vol_name": "postgres_data",
-        "vol_driver": "local",
-        "vol_external": "false"
-      }]
+      "instances": [
+        {
+          "vol_name": "postgres_data",
+          "vol_driver": "local",
+          "vol_external": "false"
+        }
+      ]
     },
     "network": {
       "enabled": true,
